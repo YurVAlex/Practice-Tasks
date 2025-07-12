@@ -1,0 +1,294 @@
+Goal: Create a console application that logs events, stores them in memory, allows retrieval, and periodically saves/loads them from a JSON file.
+
+C# Practice Task: Event Logger
+Part 1: Event Class and Static Constructor
+
+Define an Event Class:
+
+Create a public class Event with the following properties:
+
+public Guid Id { get; set; } (for a unique identifier)
+
+public string Message { get; set; }
+
+public DateTime Timestamp { get; set; }
+
+public EventType Type { get; set; } (create a public enum EventType { Information, Warning, Error })
+
+Add a constructor public Event(string message, EventType type) that initializes Id with Guid.NewGuid(), Message, Type, and Timestamp with DateTime.UtcNow.
+
+EventLogger Static Class with Static Constructor:
+
+Create a public static class EventLogger.
+
+Inside EventLogger, declare a private static Stack<Event> _eventStack;.
+
+Implement a static EventLogger() constructor.
+
+Inside the static constructor, initialize _eventStack = new Stack<Event>();.
+
+Add a Console.WriteLine("EventLogger initialized and ready to log events."); to demonstrate the static constructor's execution.
+
+Part 2: Generic Methods and Stack Usage
+
+Add Generic Method to EventLogger:
+
+Add a public static void LogEvent<T>(string message, EventType type, T additionalInfo) method to EventLogger.
+
+This method should:
+
+Create a new Event object.
+
+If T is not string, convert additionalInfo to a string using additionalInfo?.ToString() and append it to the Event's Message (e.g., event.Message = $"{message} - Info: {additionalInfo}"). If T is string, just use the original message.
+
+Push the created Event onto the _eventStack.
+
+Print to the console that the event was logged (e.g., "Logged: [Type] - [Message]")
+
+Add GetAllEvents Method:
+
+Add a public static IEnumerable<Event> GetAllEvents() method to EventLogger.
+
+This method should return all events currently in the _eventStack without removing them. (Hint: _eventStack.ToArray() or iterating and yielding).
+
+Add GetLatestEvent Method:
+
+Add a public static Event? GetLatestEvent() method.
+
+This method should return the latest event without removing it. Handle the case where the stack is empty (return null).
+
+Part 3: TPL and JSON File Handling
+
+JSON File Path:
+
+Define a private static readonly string LogFilePath = "events.json"; in EventLogger.
+
+SaveEventsToJsonAsync (TPL & JSON):
+
+Add a public static async Task SaveEventsToJsonAsync() method to EventLogger.
+
+This method should:
+
+Convert the current events in _eventStack to a List<Event> (since Stack isn't directly serializable).
+
+Use JsonSerializer.SerializeAsync (from System.Text.Json) to asynchronously write the list of events to LogFilePath.
+
+Handle potential IOException or JsonException during saving.
+
+Print a confirmation message to the console upon successful save.
+
+LoadEventsFromJsonAsync (TPL & JSON):
+
+Add a public static async Task LoadEventsFromJsonAsync() method to EventLogger.
+
+This method should:
+
+Check if LogFilePath exists. If not, print a message and return.
+
+Use JsonSerializer.DeserializeAsync to asynchronously read and deserialize the JSON file content into a List<Event>.
+
+Clear the existing _eventStack and push all loaded events onto it.
+
+Handle potential FileNotFoundException, IOException, or JsonException during loading.
+
+Print a confirmation message to the console upon successful load, including the number of events loaded.
+
+Part 4: Console Application (Putting it Together)
+
+Main Method (Program.cs):
+
+Initial Load: Call EventLogger.LoadEventsFromJsonAsync() at the beginning of your Main method.
+
+Logging Examples:
+
+Log a few Information events with different messages.
+
+Log a Warning event, passing an int as additionalInfo (e.g., EventLogger.LogEvent("Low disk space", EventType.Warning, 1024);).
+
+Log an Error event, passing a custom object (e.g., new { ErrorCode = 500, Details = "Database connection failed" }) as additionalInfo.
+
+Log another Information event.
+
+Display Latest: Call EventLogger.GetLatestEvent() and print its details.
+
+Display All: Call EventLogger.GetAllEvents() and iterate through them, printing each event's details.
+
+Save Events: Call EventLogger.SaveEventsToJsonAsync() to persist the events.
+
+Simulate Restart & Reload (Optional but Recommended):
+
+You can simulate a "restart" by, for example, logging a few more events after the initial save, then clearing the in-memory stack (for demonstration purposes, though in a real app, you'd just restart the app), and then calling LoadEventsFromJsonAsync again to show that the previously saved events are reloaded.
+
+Keep Console Open: Add Console.WriteLine("\nPress any key to exit."); and Console.ReadKey(); at the end.
+
+Part 5: ASP.NET Core Web API (Optional, but good for ASP.NET server practice)
+
+This part will require creating a new ASP.NET Core Web API project.
+
+Create a New ASP.NET Core Web API Project:
+
+dotnet new webapi -n EventLoggerApi
+
+cd EventLoggerApi
+
+Integrate EventLogger:
+
+You can either copy the Event, EventType, and EventLogger classes into your Web API project directly, or create a separate Class Library project for them and reference it. For simplicity, copying them might be easier for this exercise.
+
+EventsController:
+
+Create a new API Controller (e.g., Controllers/EventsController.cs).
+
+GET /api/events:
+
+Create an [HttpGet] action that returns all events from EventLogger.GetAllEvents().
+
+GET /api/events/latest:
+
+Create an [HttpGet("latest")] action that returns EventLogger.GetLatestEvent(). Handle the null case gracefully (e.g., NotFound()).
+
+POST /api/events:
+
+Create an [HttpPost] action that accepts an EventRequest DTO (Data Transfer Object).
+
+public class EventRequest { public string Message { get; set; } public EventType Type { get; set; } public string? AdditionalInfo { get; set; } }
+
+Inside the action, use EventLogger.LogEvent(request.Message, request.Type, request.AdditionalInfo);.
+
+Return CreatedAtAction or Ok() with a success message.
+
+POST /api/events/save:
+
+Create an [HttpPost("save")] action that calls await EventLogger.SaveEventsToJsonAsync().
+
+Return an appropriate HTTP status (e.g., Ok()).
+
+POST /api/events/load:
+
+Create an [HttpPost("load")] action that calls await EventLogger.LoadEventsFromJsonAsync().
+
+Return an appropriate HTTP status.
+
+Configure Program.cs:
+
+Ensure AddControllers() and UseAuthorization() are configured.
+
+Run the API and test with tools like Postman, Thunder Client, or curl.
+
+Key Concepts to Focus On During Implementation:
+
+Static Constructor: Observe when EventLogger() is called.
+
+Stack<T>: Understand LIFO (Last-In, First-Out) behavior.
+
+Generic Methods: See how LogEvent<T> handles different types.
+
+DateTime: Using DateTime.UtcNow for timestamps.
+
+TPL (Task, async, await): For asynchronous file I/O.
+
+JSON Files (System.Text.Json): Serialization and deserialization.
+
+ASP.NET Server: How controllers handle HTTP requests and interact with your backend logic.
+
+Goal: Create a console application that logs events, stores them in memory (using List<Event>), allows retrieval, and periodically saves/loads them from a JSON file.
+
+Part 1: Event Class and Static Constructor (No Change)
+
+Define an Event Class: (Identical to before)
+
+Create a public class Event with Id, Message, Timestamp, Type.
+
+Constructor public Event(string message, EventType type).
+
+public enum EventType { Information, Warning, Error }
+
+EventLogger Static Class with Static Constructor:
+
+Create a public static class EventLogger.
+
+Inside EventLogger, declare a private static List<Event> _eventLog;. (Changed from Stack)
+
+Implement a static EventLogger() constructor.
+
+Inside the static constructor, initialize _eventLog = new List<Event>();. (Changed from Stack)
+
+Add Console.WriteLine("EventLogger initialized and ready to log events.");.
+
+Part 2: Generic Methods and List<Event> Usage
+
+Add Generic Method to EventLogger:
+
+Add a public static void LogEvent<T>(string message, EventType type, T additionalInfo) method to EventLogger.
+
+This method should:
+
+Create a new Event object.
+
+If T is not string, convert additionalInfo to a string using additionalInfo?.ToString() and append it to the Event's Message. If T is string, just use the original message.
+
+Add the created Event to the _eventLog using _eventLog.Add(newEvent);. (Changed from Push)
+
+Print to the console that the event was logged.
+
+Add GetAllEvents Method:
+
+Add a public static IEnumerable<Event> GetAllEvents() method to EventLogger.
+
+This method should return all events currently in _eventLog. Just return _eventLog; or return _eventLog.AsReadOnly(); (if you want to prevent external modification). (Simpler than with Stack)
+
+Add GetLatestEvent Method:
+
+Add a public static Event? GetLatestEvent() method.
+
+This method should return the latest event. Use _eventLog.LastOrDefault() (or check _eventLog.Count > 0 and then _eventLog[_eventLog.Count - 1]). (Changed from Peek)
+
+Part 3: TPL and JSON File Handling (Minor Change)
+
+JSON File Path: (No Change)
+
+private static readonly string LogFilePath = "events.json";
+
+SaveEventsToJsonAsync (TPL & JSON):
+
+Add a public static async Task SaveEventsToJsonAsync() method to EventLogger.
+
+This method should:
+
+Directly use _eventLog for serialization: await JsonSerializer.SerializeAsync(fileStream, _eventLog, options); (No need to convert to List<Event> first, as _eventLog already is a List<Event>).
+
+Handle potential exceptions.
+
+Print a confirmation message.
+
+LoadEventsFromJsonAsync (TPL & JSON):
+
+Add a public static async Task LoadEventsFromJsonAsync() method to EventLogger.
+
+This method should:
+
+Check if LogFilePath exists.
+
+Deserialize directly into a List<Event>: var loadedEvents = await JsonSerializer.DeserializeAsync<List<Event>>(fileStream, options);
+
+Clear _eventLog and add loaded events: _eventLog.Clear(); _eventLog.AddRange(loadedEvents);
+
+Handle potential exceptions.
+
+Print a confirmation message.
+
+Part 4: Console Application (Putting it Together - No Change in Usage)
+
+The Main method's calls to LogEvent, GetAllEvents, GetLatestEvent, SaveEventsToJsonAsync, and LoadEventsFromJsonAsync will remain exactly the same. The internal implementation of EventLogger is what changed.
+
+Part 5: ASP.NET Core Web API (No Change in Controller Logic)
+
+The controller actions would interact with the EventLogger methods in the exact same way, as the method signatures didn't change, only the underlying data structure within EventLogger.
+
+Summary of Advantages with List<Event>:
+
+Natural Order: Events are stored and retrieved in the order they were logged.
+
+Simpler Code: Less conversion overhead for common operations like getting all events or saving.
+
+Direct Serialization: System.Text.Json works seamlessly with List<T>.
