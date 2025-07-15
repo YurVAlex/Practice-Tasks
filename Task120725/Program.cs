@@ -1,8 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using System.Collections.Generic; // Required for List<Event> iteration
-
-namespace Task120725;
+﻿namespace Task120725;
 
 internal class Program
 {
@@ -28,7 +24,7 @@ internal class Program
         IEnumerable<Event> allEvents = EventLogger.GetAllEvents();
         foreach (var ev in allEvents)
         {
-            Console.WriteLine($"[{ev.Timestamp:HH:mm:ss}] {ev.Type}: {ev.Message} (ID: {ev.Id})");
+            Console.WriteLine(ev);
         }
 
         Console.WriteLine("\n--- Latest Event ---");
@@ -36,7 +32,7 @@ internal class Program
         Event latestEvent = EventLogger.GetLatestEvent();
         if (latestEvent != null)
         {
-            Console.WriteLine($"[{latestEvent.Timestamp:HH:mm:ss}] {latestEvent.Type}: {latestEvent.Message} (ID: {latestEvent.Id})");
+            Console.WriteLine(latestEvent);
         }
         else
         {
@@ -49,5 +45,14 @@ internal class Program
         Console.WriteLine("Events saved. Check your 'D:\\Tasks Files\\events.json' file.");
 
         Console.WriteLine("\nEventLogger Test Finished.");
+
+        await EventLogger.LoadEventsFromFileAsync();
+
+        foreach (var ev in EventLogger.LoadedEvents)
+        {
+            Console.WriteLine(ev);
+        }
+
+        Console.ReadKey();
     }
 }
