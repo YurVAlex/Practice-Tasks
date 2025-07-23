@@ -1,0 +1,19 @@
+﻿How to Practice:
+Save the code: Save the code above as a .cs file (e.g., Program.cs) in a new C# Console Application project.
+
+Add NuGet Package: You'll need to add the Microsoft.Extensions.DependencyInjection NuGet package to your project. You can do this via the NuGet Package Manager in Visual Studio or by running dotnet add package Microsoft.Extensions.DependencyInjection in your project directory's terminal.
+
+Run the application: Execute the application. Observe the console output carefully, especially for Task 3, to see how the instance IDs and call counts change (or don't change) based on the chosen lifetime.
+
+Suggestions for Further Practice:
+Implement a different logger: Create a FileLogger that writes messages to a file. Register ILogger to FileLogger in the IoC container and observe that ReportGenerator and DashboardService now use the file logger without any code changes in those services.
+
+Add configuration: Imagine your EmailNotificationService needs an SMTP server address. How would you inject configuration values into it using DI? (Hint: Look into IOptions pattern in .NET).
+
+Error Handling: Add more robust error handling within your services.
+
+Unit Testing: Try writing unit tests for ReportGenerator or DashboardService. You'll find it much easier to mock ILogger and IDataService when they are injected.
+
+Explore other IoC containers: While Microsoft.Extensions.DependencyInjection is standard, other popular containers exist (e.g., Autofac, Ninject). You could try setting up a similar example with one of them to see their differences.
+
+This set of tasks should give you a solid foundation in understanding and applying Dependency Injection in your C# projects!
