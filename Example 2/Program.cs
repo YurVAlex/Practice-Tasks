@@ -56,6 +56,12 @@ internal class Program
         Console.WriteLine("\nTry to save cache:");
         storage.SaveCache(cache.ReturnCache());
 
+        Console.WriteLine("\nTry to find item with simpleID = 3:");
+        Console.WriteLine(storage.FindItemAsunc(3).Result);
+
+        Console.WriteLine("\nTry to find not existed item with simpleID = 2575:");
+        Console.WriteLine(storage.FindItemAsunc(2575).Result);
+
         var timeDifference = DateTime.Now - startTime;
         Console.WriteLine(timeDifference.Milliseconds.ToString());
 

@@ -10,7 +10,7 @@ internal class MemoryCache : ICache
         if (item != null) 
         { 
             _items.Add(item);
-            await CombineLoger.Log($"{item} ==> added to cache.");
+            await CombineLoger.LogAsunc($"{item} ==> added to cache.");
         }
     }
 
@@ -36,7 +36,7 @@ internal class MemoryCache : ICache
 
         if (temp == null)
         {
-            await CombineLoger.Log($"Item with ID:{simpleId} does not exists in the cache...");
+            await CombineLoger.LogAsunc($"Item with ID:{simpleId} does not exists in the cache...");
         }
 
         return temp;
@@ -48,7 +48,7 @@ internal class MemoryCache : ICache
         
         if (temp == null)
         {
-            await CombineLoger.Log($"Item with name or description ({description}) does not exists in the cache...");
+            await CombineLoger.LogAsunc($"Item with name or description ({description}) does not exists in the cache...");
         }
 
         return temp;
@@ -61,7 +61,7 @@ internal class MemoryCache : ICache
         if (temp != null)
         {
             _items.Remove(temp);
-            await CombineLoger.Log($"{temp} ==> removed from cache.");
+            await CombineLoger.LogAsunc($"{temp} ==> removed from cache.");
         }
     }
 
@@ -81,7 +81,7 @@ internal class MemoryCache : ICache
             temp.Name = name;
             temp.Description = description;
 
-            await CombineLoger.Log(logMessage + $" ==> changed to:\nItem {simpleId}: {temp.Name}, {temp.Description}\n");
+            await CombineLoger.LogAsunc(logMessage + $" ==> changed to:\nItem {simpleId}: {temp.Name}, {temp.Description}\n");
         }
     }
 }

@@ -113,3 +113,72 @@ The 1: [24.07.2025 21:57:15] - Ball (Green, medium size) saved in D:\Practice-Ta
 The 3: [24.07.2025 21:57:15] - Plate (White) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
 The 4: [24.07.2025 21:57:15] - Ring (Golden) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
 The 2: [24.07.2025 21:57:15] - Cube (Big, steel, gray) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+1: [25.07.2025 21:28:02] - Ball (Green, medium size) ==> added to cache.
+2: [25.07.2025 21:28:02] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [25.07.2025 21:28:02] - Plate (White) ==> added to cache.
+4: [25.07.2025 21:28:02] - Ring (Golden) ==> added to cache.
+Item with name or description (Black) does not exists in the cache...
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:28:02] - Box (Yellow, medium size, paper) ==> removed from cache.
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:28:02] - Box (Yellow, medium size, paper) ==> added to cache.
+Item 2: Box, Yellow, medium size, paper ==> changed to:
+Item 2: Cube, Big, steel, gray
+
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt created.
+The 1: [25.07.2025 21:28:02] - Ball (Green, medium size) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 3: [25.07.2025 21:28:02] - Plate (White) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 4: [25.07.2025 21:28:02] - Ring (Golden) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 2: [25.07.2025 21:28:02] - Cube (Big, steel, gray) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+1: [25.07.2025 21:28:30] - Ball (Green, medium size) ==> added to cache.
+2: [25.07.2025 21:28:30] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [25.07.2025 21:28:30] - Plate (White) ==> added to cache.
+4: [25.07.2025 21:28:30] - Ring (Golden) ==> added to cache.
+Item with name or description (Black) does not exists in the cache...
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:28:30] - Box (Yellow, medium size, paper) ==> removed from cache.
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:28:30] - Box (Yellow, medium size, paper) ==> added to cache.
+Item 2: Box, Yellow, medium size, paper ==> changed to:
+Item 2: Cube, Big, steel, gray
+
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt created.
+The 1: [25.07.2025 21:28:30] - Ball (Green, medium size) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 3: [25.07.2025 21:28:30] - Plate (White) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 4: [25.07.2025 21:28:30] - Ring (Golden) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 2: [25.07.2025 21:28:30] - Cube (Big, steel, gray) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+1: [25.07.2025 21:29:48] - Ball (Green, medium size) ==> added to cache.
+2: [25.07.2025 21:29:48] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [25.07.2025 21:29:48] - Plate (White) ==> added to cache.
+4: [25.07.2025 21:29:48] - Ring (Golden) ==> added to cache.
+Item with name or description (Black) does not exists in the cache...
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:29:48] - Box (Yellow, medium size, paper) ==> removed from cache.
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:29:48] - Box (Yellow, medium size, paper) ==> added to cache.
+Item 2: Box, Yellow, medium size, paper ==> changed to:
+Item 2: Cube, Big, steel, gray
+
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt created.
+The 1: [25.07.2025 21:29:48] - Ball (Green, medium size) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 3: [25.07.2025 21:29:48] - Plate (White) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 4: [25.07.2025 21:29:48] - Ring (Golden) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 2: [25.07.2025 21:29:48] - Cube (Big, steel, gray) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+1: [25.07.2025 21:31:48] - Ball (Green, medium size) ==> added to cache.
+2: [25.07.2025 21:31:48] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [25.07.2025 21:31:48] - Plate (White) ==> added to cache.
+4: [25.07.2025 21:31:48] - Ring (Golden) ==> added to cache.
+Item with name or description (Black) does not exists in the cache...
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:31:48] - Box (Yellow, medium size, paper) ==> removed from cache.
+Item with ID:5 does not exists in the cache...
+2: [25.07.2025 21:31:48] - Box (Yellow, medium size, paper) ==> added to cache.
+Item 2: Box, Yellow, medium size, paper ==> changed to:
+Item 2: Cube, Big, steel, gray
+
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt created.
+The 1: [25.07.2025 21:31:48] - Ball (Green, medium size) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 3: [25.07.2025 21:31:48] - Plate (White) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 4: [25.07.2025 21:31:48] - Ring (Golden) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+The 2: [25.07.2025 21:31:48] - Cube (Big, steel, gray) saved in D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt
+Cant find item with simpleID 2575 in the storage.
