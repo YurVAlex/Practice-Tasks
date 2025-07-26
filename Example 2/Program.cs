@@ -1,9 +1,12 @@
-﻿namespace Example_2;
+﻿using System.Diagnostics;
+
+namespace Example_2;
 
 internal class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
+        var stopwatch = Stopwatch.StartNew();
         var startTime = DateTime.Now;
 
         var item1 = new Item("Ball", "Green, medium size");
@@ -17,55 +20,66 @@ internal class Program
         Console.WriteLine(item3);
         Console.WriteLine(item4);
 
+        var creationTime = stopwatch.ElapsedMilliseconds;
+        var creationDate = DateTime.Now - startTime;
+        Console.WriteLine($"Time to create items: {creationTime} ms, ({creationDate.TotalMilliseconds})");
+
         ICache cache = new MemoryCache();
 
-        Console.WriteLine("\nTry o add all items to cache:");
-        cache.AddItems(item1, item2, item3, item4);
+        Console.WriteLine("\nTry to add all items to cache:");
+        await cache.AddItemsAsunc(item1, item2, item3, item4);
+
+        stopwatch.Stop();
+        var finishTime = DateTime.Now - startTime;
+        Console.WriteLine($"Time to add items to cache: {stopwatch.ElapsedMilliseconds - creationTime} ms");
+        
+        Console.WriteLine($"Total time: {stopwatch.ElapsedMilliseconds} ms ({(finishTime).TotalMilliseconds}), ({stopwatch.ElapsedTicks} ticks)");
 
 
-        Console.WriteLine("\nTry find item with simpleID = 3 in cache:");
-        Console.WriteLine(cache.FindItem(3).Result);
+        /*        Console.WriteLine("\nTry find item with simpleID = 3 in cache:");
+                Console.WriteLine(cache.FindItem(3).Result);
 
-        Console.WriteLine("\nTry find item by name (Ring) in cache:");
-        Console.WriteLine(cache.FindItem("Ring").Result);
+                Console.WriteLine("\nTry find item by name (Ring) in cache:");
+                Console.WriteLine(cache.FindItem("Ring").Result);
 
-        Console.WriteLine("\nTry find item by description (White) in cache:");
-        Console.WriteLine(cache.FindItem("White").Result);
+                Console.WriteLine("\nTry find item by description (White) in cache:");
+                Console.WriteLine(cache.FindItem("White").Result);
 
-        Console.WriteLine("\nTry find item by description (Black) in cache:");
-        Console.WriteLine(cache.FindItem("Black").Result);
+                Console.WriteLine("\nTry find item by description (Black) in cache:");
+                Console.WriteLine(cache.FindItem("Black").Result);
 
-        Console.WriteLine("\nTry find item with simpleID = 5 in cache:");
-        Console.WriteLine(cache.FindItem(5).Result);
+                Console.WriteLine("\nTry find item with simpleID = 5 in cache:");
+                Console.WriteLine(cache.FindItem(5).Result);
 
-        Console.WriteLine("\nTry to remove item with simpleID = 2 from cache:");
-        cache.RemoveItem(2);
+                Console.WriteLine("\nTry to remove item with simpleID = 2 from cache:");
+                cache.RemoveItem(2);
 
-        Console.WriteLine("\nTry to remove item with simpleID = 5 from cache:");
-        cache.RemoveItem(5);
+                Console.WriteLine("\nTry to remove item with simpleID = 5 from cache:");
+                cache.RemoveItem(5);
 
-        Console.WriteLine("\nTry to ADD item AGAIN TO cache:");
-        cache.AddItem(item2);
+                Console.WriteLine("\nTry to ADD item AGAIN TO cache:");
+                cache.AddItem(item2);
 
-        Console.WriteLine("\nTry to rewrite item 2 in cache:");
-        cache.RewriteItem(2, "Cube", "Big, steel, gray");
+                Console.WriteLine("\nTry to rewrite item 2 in cache:");
+                cache.RewriteItem(2, "Cube", "Big, steel, gray");
 
-        Console.WriteLine("\nTry to create storage:");
-        var storage = new StorageJSON(@"D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt");
+                Console.WriteLine("\nTry to create storage:");
+                var storage = new StorageJSON(@"D:\Practice-Tasks\Example 2\Storage Folder\JSONStorage.txt");
 
-        Console.WriteLine("\nTry to save cache:");
-        storage.SaveCache(cache.ReturnCache());
+                Console.WriteLine("\nTry to save cache:");
+                storage.SaveCache(cache.ReturnCache());
 
-        Console.WriteLine("\nTry to find item with simpleID = 3:");
-        Console.WriteLine(storage.FindItemAsunc(3).Result);
+                Console.WriteLine("\nTry to find item with simpleID = 3:");
+                Console.WriteLine(storage.FindItemAsunc(3).Result);
 
-        Console.WriteLine("\nTry to find not existed item with simpleID = 2575:");
-        Console.WriteLine(storage.FindItemAsunc(2575).Result);
+                Console.WriteLine("\nTry to find not existed item with simpleID = 2575:");
+                Console.WriteLine(storage.FindItemAsunc(2575).Result);
 
-        var timeDifference = DateTime.Now - startTime;
-        Console.WriteLine(timeDifference.Milliseconds.ToString());
+                var timeDifference = DateTime.Now - startTime;
+                Console.WriteLine(timeDifference.Milliseconds.ToString());
 
-        Console.ReadKey();
+                Console.ReadKey();
+        */
     }
 }
  

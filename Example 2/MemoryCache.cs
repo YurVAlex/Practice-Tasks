@@ -1,12 +1,14 @@
 ﻿
+using System.Threading.Tasks;
+
 namespace Example_2;
 
 internal class MemoryCache : ICache
 {
     private static List<Item> _items = [];    
 
-    public async Task AddItem(Item item)
-    {
+    public async Task AddItemAsunc(Item item)
+    {   
         if (item != null) 
         { 
             _items.Add(item);
@@ -14,17 +16,24 @@ internal class MemoryCache : ICache
         }
     }
 
-    public void AddItems(params Item[] items)
+    public async Task AddItemsAsunc(params Item[] items)
     {
         if (items.Length > 0)
         {
-            foreach (Item item in items)
+            Task[] tasks = new Task[items.Length];
+
+            for (int i = 0; i < items.Length; i++)
             {
-                AddItem(item).Wait();
+                tasks[i] = AddItemAsunc(items[i]);
+            }
+
+            for (int i = 0; i < items.Length; i++)
+            {
+                await tasks[i];
             }
         }
     }
-
+        
     public void Clear()
     {
         _items.Clear();

@@ -9,6 +9,8 @@ internal static class CombineLoger
         Console.WriteLine(message);
 
         await File.AppendAllTextAsync(_logfilePath, message + "\n");
+
+        await Task.Delay(3000);
     }
 
     public static void Log(string message)

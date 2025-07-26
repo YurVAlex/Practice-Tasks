@@ -2,9 +2,9 @@
 
 interface ICache
 {
-    Task AddItem(Item item);
+    Task AddItemAsunc(Item item);
 
-    void AddItems(params Item[] items);
+    Task AddItemsAsunc(params Item[] items);
 
     //void RemoveItem(Item item);
 
