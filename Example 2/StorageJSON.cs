@@ -56,7 +56,7 @@ namespace Example_2
         {
             if (!File.Exists(_storagePath))
             {
-                await CombineLoger.LogAsunc("The storage is not initialized or missed. Process aborted.");
+                CombineLoger.Log("The storage is not initialized or missed. Process aborted.");
             }
 
             try
@@ -86,10 +86,10 @@ namespace Example_2
             }
             catch (Exception ex)
             {
-                await CombineLoger.LogAsunc($"Error: {ex.Message}");
+                CombineLoger.Log($"Error: {ex.Message}");
             }
 
-            await CombineLoger.LogAsunc($"Cant find item with simpleID {simpleID} in the storage.");
+            CombineLoger.Log($"Cant find item with simpleID {simpleID} in the storage.");
             return null;
         }
 
@@ -109,7 +109,7 @@ namespace Example_2
             {
                 var json = JsonSerializer.Serialize(item);
                 await File.AppendAllTextAsync(_storagePath, json + "\n");
-                await CombineLoger.LogAsunc($"The {item} saved in {_storagePath}");
+                CombineLoger.Log($"The {item} saved in {_storagePath}");
             }
         }
 
