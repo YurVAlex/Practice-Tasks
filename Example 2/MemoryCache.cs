@@ -29,7 +29,7 @@ internal class MemoryCache
         _items.Clear();
     }
 
-    public async Task<Item?> FindItem(int simpleId)
+    public Item? FindItem(int simpleId)
     {
         var temp = _items.FirstOrDefault(_ => _.SimpleID == simpleId);
 
@@ -41,7 +41,7 @@ internal class MemoryCache
         return temp;
     }
 
-    public async Task<Item?> FindItem(string description)
+    public Item? FindItem(string description)
     {
         var temp = _items.FirstOrDefault(_ => (_.Name == description) || (_.Description == description));
         
@@ -53,9 +53,9 @@ internal class MemoryCache
         return temp;
     }
 
-    public async Task RemoveItem(int simpleId)
+    public void RemoveItem(int simpleId)
     {
-        var temp = FindItem(simpleId).Result;
+        var temp = FindItem(simpleId);
 
         if (temp != null)
         {
@@ -64,14 +64,14 @@ internal class MemoryCache
         }
     }
 
-    public IEnumerable<Item> ReturnCache()
+    public List<Item> ReturnCache()
     {
         return _items;
     }
 
-    public async Task RewriteItem(int simpleId, string name, string description)
+    public void RewriteItem(int simpleId, string name, string description)
     {
-        var temp = FindItem(simpleId).Result;
+        var temp = FindItem(simpleId);
 
         if (temp != null)
         {

@@ -1,9 +1,10 @@
 ﻿
+using System.Text;
 using System.Text.Json;
 
 namespace Example_2
 {
-    internal class StorageJSON : IStorage
+    internal class StorageJSON 
     {
         private string _storagePath;
 
@@ -93,14 +94,31 @@ namespace Example_2
             return null;
         }
 
-        public void SaveCache(IEnumerable<Item> items)
+        public async Task SaveCache(List<Item> items)
         {
-            foreach (var item in items)
+            /*foreach (var item in items)
             { 
                 SaveItem(item).Wait();
-            }
+            }*/
+            var sb = new StringBuilder();
 
-            
+            var lenght = items.Count;
+
+            if (lenght > 0)
+            {
+                for (int i = 0; i < lenght; i++)
+                {
+                    var json = JsonSerializer.Serialize(items[i]);
+                    sb.AppendLine(json);
+                }
+
+                await File.AppendAllTextAsync(_storagePath, sb.ToString());
+
+                for (int i = 0; i < lenght; i++)
+                {
+                    CombineLoger.Log($"The {items[i]} saved in {_storagePath}");
+                }
+            }
         }
 
         public async Task SaveItem(Item item)
