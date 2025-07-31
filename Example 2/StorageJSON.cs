@@ -2,174 +2,93 @@
 using System.Text;
 using System.Text.Json;
 
-namespace Example_2
-{
-    internal class StorageJSON 
-    {
-        private string _storagePath;
+namespace Example_2;
 
-        public StorageJSON(string filePath)
+internal class StorageJSON 
+{
+    private string _storagePath;
+
+    public StorageJSON(string filePath)
+    {
+        _storagePath = filePath;
+        CombineLoger.Log($"New storage in {filePath} created.");
+    }
+
+    public string StoragePath { get { return _storagePath; } }
+
+    public async Task SaveCache(List<Item> items)
+    {
+        var sb = new StringBuilder();
+
+        var lenght = items.Count;
+
+        if (lenght > 0)
         {
-            _storagePath = filePath;
-            CombineLoger.Log($"New storage in {filePath} created.");
+            for (int i = 0; i < lenght; i++)
+            {
+                var json = JsonSerializer.Serialize(items[i]);
+                sb.AppendLine(json);
+            }
+
+            await File.AppendAllTextAsync(_storagePath, sb.ToString());
+
+            for (int i = 0; i < lenght; i++)
+            {
+                CombineLoger.Log($"The {items[i]} saved in {_storagePath}");
+            }
+        }
+    }
+
+    public async Task SaveItem(Item item)
+    {
+        if (item != null)
+        {
+            var json = JsonSerializer.Serialize(item);
+            await File.AppendAllTextAsync(_storagePath, json + "\n");
+            CombineLoger.Log($"The {item} saved in {_storagePath}");
+        }
+    }
+
+    public async Task<Item> FindItemAsunc(int simpleID)
+    {
+        if (!File.Exists(_storagePath))
+        {
+            CombineLoger.Log("The storage is not initialized or missed. Process aborted.");
         }
 
-        /*        public async Task DeleteItem(int simpleID)
+        try
+        {
+            var content = await File.ReadAllLinesAsync(_storagePath);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            foreach (var line in content)
+            {
+                if (line.Contains($"\"SimpleID\":{simpleID}"))
                 {
-                    if (!File.Exists(_storagePath))
-                    {
-                        await CombineLoger.Log("The storage is not initialized or missed. Process aborted.");
-                    }
                     try
                     {
-                        var content = await File.ReadAllLinesAsync(_storagePath);
-
-                        var listItems = content.ToList();
-
-                        var resultListItems = new List<string>();
-
-                        var options = new JsonSerializerOptions
+                        var temp = JsonSerializer.Deserialize<Item>(line);
+                        if (temp != null && temp.SimpleID == simpleID)
                         {
-                            PropertyNameCaseInsensitive = true
-                        };
-
-                        foreach (var line in content)
-                        {
-                            try
-                            {
-                                var temp = JsonSerializer.Deserialize<Item>(line);
-                                if (temp != null && temp.SimpleID != simpleID)
-                                {
-                                    resultListItems
-                                }
-                            }
-                            catch { }
+                            return temp;
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        await CombineLoger.Log($"Error: {ex.Message}");
-                    }
-
-                }*/
-
-        public async Task<Item> FindItemAsunc(int simpleID)
-        {
-            if (!File.Exists(_storagePath))
-            {
-                CombineLoger.Log("The storage is not initialized or missed. Process aborted.");
-            }
-
-            try
-            {
-                var content = await File.ReadAllLinesAsync(_storagePath);
-
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                };
-
-                foreach (var line in content)
-                {
-                    if (line.Contains($"\"SimpleID\":{simpleID}"))
-                    {
-                        try
-                        {
-                            var temp = JsonSerializer.Deserialize<Item>(line);
-                            if (temp != null && temp.SimpleID == simpleID)
-                            {
-                                return temp;
-                            }
-                        }
-                        catch { } // to skip non-serialable lines
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                CombineLoger.Log($"Error: {ex.Message}");
-            }
-
-            CombineLoger.Log($"Cant find item with simpleID {simpleID} in the storage.");
-            return null;
-        }
-
-        public async Task SaveCache(List<Item> items)
-        {
-            /*foreach (var item in items)
-            { 
-                SaveItem(item).Wait();
-            }*/
-            var sb = new StringBuilder();
-
-            var lenght = items.Count;
-
-            if (lenght > 0)
-            {
-                for (int i = 0; i < lenght; i++)
-                {
-                    var json = JsonSerializer.Serialize(items[i]);
-                    sb.AppendLine(json);
-                }
-
-                await File.AppendAllTextAsync(_storagePath, sb.ToString());
-
-                for (int i = 0; i < lenght; i++)
-                {
-                    CombineLoger.Log($"The {items[i]} saved in {_storagePath}");
+                    catch { } // to skip non-serialable lines
                 }
             }
         }
-
-        public async Task SaveItem(Item item)
+        catch (Exception ex)
         {
-            if (item != null)
-            {
-                var json = JsonSerializer.Serialize(item);
-                await File.AppendAllTextAsync(_storagePath, json + "\n");
-                CombineLoger.Log($"The {item} saved in {_storagePath}");
-            }
+            CombineLoger.Log($"Error: {ex.Message}");
         }
 
-        /*public static async Task<List<string>> ReadFileUntilCondition(string filePath, Func<string, bool> breakCondition)
-        {
-            var linesRead = new List<string>();
-
-            if (!File.Exists(filePath))
-            {
-                await CombineLoger.Log("The storage is not initialized or missed. Process aborted.");
-                return linesRead; // Return an empty list if file doesn't exist
-            }
-
-            try
-            {
-                using StreamReader reader = new(filePath);
-                string? line;
-
-                while ((line = await reader.ReadLineAsync()) != null) 
-                {
-                    linesRead.Add(line); 
-
-                    // Check if the break condition is met for the current line
-                    if (breakCondition(line))
-                    {
-                        Console.WriteLine($"Break condition met on line: \"{line}\"");
-                        break; // Exit the loop
-                    }
-                }
-            }
-            catch (IOException ex)
-            {
-                // Handle any IO errors that might occur during file reading
-                Console.WriteLine($"An I/O error occurred: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                // Catch any other unexpected errors
-                Console.WriteLine($"An unexpected error occurred: {ex.Message}");
-            }
-
-            return linesRead;
-        }*/
+        CombineLoger.Log($"Cant find item with simpleID {simpleID} in the storage.");
+        return null;
     }
+
+    
 }

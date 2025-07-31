@@ -1,16 +1,13 @@
-﻿
-using System.Threading.Tasks;
+﻿namespace Example_2;
 
-namespace Example_2;
-
-internal class MemoryCache 
+internal class MemoryCache
 {
-    private static List<Item> _items = [];    
+    private static List<Item> _items = [];
 
     public void AddItem(Item item)
-    {   
-        if (item != null) 
-        { 
+    {
+        if (item != null)
+        {
             _items.Add(item);
             CombineLoger.Log($"{item} ==> added to cache.");
         }
@@ -23,7 +20,7 @@ internal class MemoryCache
             AddItem(item);
         }
     }
-        
+
     public void Clear()
     {
         _items.Clear();
@@ -44,7 +41,7 @@ internal class MemoryCache
     public Item? FindItem(string description)
     {
         var temp = _items.FirstOrDefault(_ => (_.Name == description) || (_.Description == description));
-        
+
         if (temp == null)
         {
             CombineLoger.Log($"Item with name or description ({description}) does not exists in the cache...");
@@ -81,6 +78,24 @@ internal class MemoryCache
             temp.Description = description;
 
             CombineLoger.Log(logMessage + $" ==> changed to:\nItem {simpleId}: {temp.Name}, {temp.Description}\n");
+        }
+    }
+
+    public async Task RewriteCacheWithDataFromStorage(string storagePath)
+    {
+        Clear();
+
+        var temp = await Loader.LoadAsync(storagePath);
+        _items = temp ?? [];
+
+        CombineLoger.Log($"Data loaded to cache from {storagePath}");
+    }
+
+    public void ShowCachedItems()
+    {
+        for (int i = 0; i < _items.Count; i++)
+        {
+            Console.WriteLine($"{i+1}. Cache item - " + _items[i]);
         }
     }
 }
