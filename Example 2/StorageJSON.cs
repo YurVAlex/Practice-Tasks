@@ -8,10 +8,19 @@ internal class StorageJSON
 {
     private string _storagePath;
 
-    public StorageJSON(string filePath)
+    public StorageJSON(string filePath = "StorageJSON.json")
     {
-        _storagePath = filePath;
-        CombineLoger.Log($"New storage in {filePath} created.");
+        try
+        {
+            File.WriteAllText(filePath, ""); //Create file with test
+            Storage.Storages.Add(filePath);
+            _storagePath = filePath;
+            CombineLoger.Log($"New storage in {filePath} created.");
+        }
+        catch (Exception ex)
+        {
+            CombineLoger.Log(ex.Message);
+        }
     }
 
     public string StoragePath { get { return _storagePath; } }

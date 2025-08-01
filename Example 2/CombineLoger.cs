@@ -4,7 +4,7 @@ namespace Example_2;
 
 internal static class CombineLoger
 {
-    private static string _logfilePath = @"D:\Practice-Tasks\Example 2\Logfile Folder\logfile.txt";
+    private static string _logfilePath = @"D:\Repos\Practice-Tasks\Example 2\Logfile Folder\logfile.txt";
 
     private static int _logRecords = 0;
 

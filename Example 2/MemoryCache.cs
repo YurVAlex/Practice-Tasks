@@ -4,6 +4,25 @@ internal class MemoryCache
 {
     private static List<Item> _items = [];
 
+    public string Name { get; private set; }
+
+    private static int CacheId = 0;
+
+    public MemoryCache(string name = "")
+    {
+        CacheId++;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            Name = "Noname" + CacheId.ToString();
+        }
+        else
+        {
+            Name = name;
+        }
+        
+    }
+
     public void AddItem(Item item)
     {
         if (item != null)
