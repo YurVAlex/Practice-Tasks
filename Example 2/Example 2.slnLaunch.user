@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "Example 2.csproj",
+        "Action": "Start",
+        "DebugTarget": "Example 2"
+      },
+      {
+        "Path": "..\\ItemsSerwerApp\\ItemsSerwerApp.csproj",
+        "Action": "Start",
+        "DebugTarget": "http"
+      }
+    ]
+  }
+]

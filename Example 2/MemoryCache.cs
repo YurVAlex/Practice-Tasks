@@ -1,5 +1,6 @@
 ﻿using System.Net.Http;
 using System.Text.Json;
+using static System.Net.WebRequestMethods;
 
 namespace Example_2;
 
@@ -124,12 +125,12 @@ internal class MemoryCache
         }
     }
 
-    public async Task SendCacheToUrlAsync(string url)
+    public async Task SendCacheToUrlAsync(string url = "http://localhost:5010/api/items/receive-cache")
     {
         if (string.IsNullOrWhiteSpace(url))
         {
-            CombineLoger.Log("URL cannot be null or empty. Process aborted.");
-            return;
+            CombineLoger.Log("URL cannot be null or empty. Sending to: http://localhost:5010/api/items/receive-cache");
+            url = "http://localhost:5010/api/items/receive-cache";
         }
 
         try

@@ -8,3 +8,23 @@ New storage in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt created.
 7: [01.08.2025 17:59:17] - Sphere (Plastic) ==> added to cache.
 8: [01.08.2025 17:59:46] - Bow (Wooden) ==> added to cache.
 The 1: [01.08.2025 17:55:55] - Ball (Green, medium size) saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt created.
+1: [01.08.2025 19:43:57] - Ball (Green, medium size) ==> added to cache.
+2: [01.08.2025 19:43:57] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [01.08.2025 19:43:57] - Plate (White) ==> added to cache.
+4: [01.08.2025 19:43:57] - Ring (Golden) ==> added to cache.
+5: [01.08.2025 19:43:57] - Cube (Big, steel, gray) ==> added to cache.
+The 1: [01.08.2025 19:43:57] - Ball (Green, medium size) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+The 2: [01.08.2025 19:43:57] - Box (Yellow, medium size, paper) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+The 3: [01.08.2025 19:43:57] - Plate (White) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+The 4: [01.08.2025 19:43:57] - Ring (Golden) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt created.
+1: [01.08.2025 20:06:45] - Ball (Green, medium size) ==> added to cache.
+2: [01.08.2025 20:06:45] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [01.08.2025 20:06:45] - Plate (White) ==> added to cache.
+4: [01.08.2025 20:06:45] - Ring (Golden) ==> added to cache.
+5: [01.08.2025 20:06:45] - Cube (Big, steel, gray) ==> added to cache.
+URL cannot be null or empty. Sending to: http://localhost:5010/api/items/receive-cache
+Successfully sent cache data to http://localhost:5010/api/items/receive-cache. Status code: OK
+6: [01.08.2025 20:09:34] - Cone (Wooden, big) ==> added to cache.
+URL cannot be null or empty. Sending to: http://localhost:5010/api/items/receive-cache

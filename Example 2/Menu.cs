@@ -33,6 +33,7 @@ internal static class Menu
             Console.WriteLine("8.  Load storage to cache");
             Console.WriteLine("9.  Find an item in storage by SimpleID");
             Console.WriteLine("10. Add a new item manually to cache");
+            Console.WriteLine("11. Send cache to URL");
             Console.WriteLine("0.  Exit");
             Console.WriteLine("======================================");
 
@@ -153,7 +154,13 @@ internal static class Menu
                     Console.WriteLine($"Added new item: {newItem}");
                     Console.ReadKey();
                     break;
-
+                case "11":
+                    Console.Clear();
+                    Console.Write("Enter a URL to send cache data: ");
+                    string? url = Console.ReadLine();
+                    cache.SendCacheToUrlAsync(url);
+                    Console.ReadKey();
+                    break;
                 case "0":
                     running = false;
                     break;
