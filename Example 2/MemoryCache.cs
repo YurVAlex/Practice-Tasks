@@ -1,4 +1,7 @@
-﻿namespace Example_2;
+﻿using System.Net.Http;
+using System.Text.Json;
+
+namespace Example_2;
 
 internal class MemoryCache
 {
@@ -7,6 +10,9 @@ internal class MemoryCache
     public string Name { get; private set; }
 
     private static int CacheId = 0;
+
+    // It is a best practice to reuse a single instance of HttpClient.
+    private static readonly HttpClient _httpClient = new();
 
     public MemoryCache(string name = "")
     {
@@ -115,6 +121,42 @@ internal class MemoryCache
         for (int i = 0; i < _items.Count; i++)
         {
             Console.WriteLine($"{i+1}. Cache item - " + _items[i]);
+        }
+    }
+
+    public async Task SendCacheToUrlAsync(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            CombineLoger.Log("URL cannot be null or empty. Process aborted.");
+            return;
+        }
+
+        try
+        {
+            // Serialize the list of items to a JSON string.
+            var jsonContent = JsonSerializer.Serialize(_items);
+
+            // Create StringContent with the JSON and set the content type header.
+            var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+            // Send the JSON content to the specified URL using a POST request.
+            var response = await _httpClient.PostAsync(url, content);
+
+            // Check if the request was successful.
+            if (response.IsSuccessStatusCode)
+            {
+                CombineLoger.Log($"Successfully sent cache data to {url}. Status code: {response.StatusCode}");
+            }
+            else
+            {
+                CombineLoger.Log($"Failed to send cache data to {url}. Status code: {response.StatusCode}");
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            // Log any exceptions that occur during the HTTP request.
+            CombineLoger.Log($"An error occurred while sending data: {ex.Message}");
         }
     }
 }

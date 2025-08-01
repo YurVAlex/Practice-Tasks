@@ -1,20 +1,10 @@
-New storage in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt created.
-1: [01.08.2025 14:54:03] - Ball (Green, medium size) ==> added to cache.
-2: [01.08.2025 14:54:03] - Box (Yellow, medium size, paper) ==> added to cache.
-3: [01.08.2025 14:54:03] - Plate (White) ==> added to cache.
-4: [01.08.2025 14:54:03] - Ring (Golden) ==> added to cache.
-5: [01.08.2025 14:54:03] - Cube (Big, steel, gray) ==> added to cache.
-1: [01.08.2025 14:54:03] - Ball (Green, medium size) ==> added to cache.
-2: [01.08.2025 14:54:03] - Box (Yellow, medium size, paper) ==> added to cache.
-3: [01.08.2025 14:54:03] - Plate (White) ==> added to cache.
-4: [01.08.2025 14:54:03] - Ring (Golden) ==> added to cache.
-5: [01.08.2025 14:54:03] - Cube (Big, steel, gray) ==> added to cache.
-Cant find item with simpleID 5 in the storage.
-The 1: [01.08.2025 14:54:03] - Ball (Green, medium size) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 2: [01.08.2025 14:54:03] - Box (Yellow, medium size, paper) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 3: [01.08.2025 14:54:03] - Plate (White) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 4: [01.08.2025 14:54:03] - Ring (Golden) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 5: [01.08.2025 14:54:03] - Cube (Big, steel, gray) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 1: [01.08.2025 14:54:03] - Ball (Green, medium size) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 2: [01.08.2025 14:54:03] - Box (Yellow, medium size, paper) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
-The 3: [01.08.2025 14:54:03] - Plate (White) saved in D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt created.
+1: [01.08.2025 17:55:55] - Ball (Green, medium size) ==> added to cache.
+2: [01.08.2025 17:55:55] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [01.08.2025 17:55:55] - Plate (White) ==> added to cache.
+4: [01.08.2025 17:55:55] - Ring (Golden) ==> added to cache.
+5: [01.08.2025 17:55:55] - Cube (Big, steel, gray) ==> added to cache.
+6: [01.08.2025 17:57:00] - Prism (Transparent) ==> added to cache.
+7: [01.08.2025 17:59:17] - Sphere (Plastic) ==> added to cache.
+8: [01.08.2025 17:59:46] - Bow (Wooden) ==> added to cache.
+The 1: [01.08.2025 17:55:55] - Ball (Green, medium size) saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt

@@ -43,7 +43,7 @@ internal class StorageJSON
 
             for (int i = 0; i < lenght; i++)
             {
-                CombineLoger.Log($"The {items[i]} saved in {_storagePath}");
+                CombineLoger.Log($"The {items[i]} ==> saved in {_storagePath}");
             }
         }
     }
@@ -54,7 +54,7 @@ internal class StorageJSON
         {
             var json = JsonSerializer.Serialize(item);
             await File.AppendAllTextAsync(_storagePath, json + "\n");
-            CombineLoger.Log($"The {item} saved in {_storagePath}");
+            CombineLoger.Log($"The {item} ==> saved in {_storagePath}");
         }
     }
 

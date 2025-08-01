@@ -109,7 +109,7 @@ internal class Program
         */
 
         var cache = new MemoryCache();
-        var storage = new StorageJSON(@"D:\Repos\Practice-Tasks\Example 2\Storage Folder\Storage.txt");
+        var storage = new StorageJSON(@"D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt");
 
         await Menu.ShowMenu(cache, storage);
 
