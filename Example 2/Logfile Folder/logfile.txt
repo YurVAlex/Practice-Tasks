@@ -28,3 +28,13 @@ URL cannot be null or empty. Sending to: http://localhost:5010/api/items/receive
 Successfully sent cache data to http://localhost:5010/api/items/receive-cache. Status code: OK
 6: [01.08.2025 20:09:34] - Cone (Wooden, big) ==> added to cache.
 URL cannot be null or empty. Sending to: http://localhost:5010/api/items/receive-cache
+New storage in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt created.
+1: [02.08.2025 14:06:41] - Ball (Green, medium size) ==> added to cache.
+2: [02.08.2025 14:06:41] - Box (Yellow, medium size, paper) ==> added to cache.
+3: [02.08.2025 14:06:41] - Plate (White) ==> added to cache.
+4: [02.08.2025 14:06:41] - Ring (Golden) ==> added to cache.
+5: [02.08.2025 14:06:41] - Cube (Big, steel, gray) ==> added to cache.
+The 1: [02.08.2025 14:06:41] - Ball (Green, medium size) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+The 2: [02.08.2025 14:06:41] - Box (Yellow, medium size, paper) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+The 3: [02.08.2025 14:06:41] - Plate (White) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
+The 4: [02.08.2025 14:06:41] - Ring (Golden) ==> saved in D:\Practice-Tasks\Example 2\Storage Folder\Storage.txt
