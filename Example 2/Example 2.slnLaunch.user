@@ -11,6 +11,11 @@
         "Path": "..\\ItemsSerwerApp\\ItemsSerwerApp.csproj",
         "Action": "Start",
         "DebugTarget": "http"
+      },
+      {
+        "Path": "..\\HttpListenerServer\\HttpListenerServer.csproj",
+        "Action": "Start",
+        "DebugTarget": "HttpListenerServer"
       }
     ]
   }

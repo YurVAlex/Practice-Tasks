@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ItemsSerwerApp", "..\ItemsS
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HttpListenerServer", "..\HttpListenerServer\HttpListenerServer.csproj", "{3A14A245-229F-40D7-9CE8-87D87E7D0422}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wallet", "..\Wallet\Wallet.csproj", "{36CBDB88-A297-4578-A275-8EB77A0EE79E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{3A14A245-229F-40D7-9CE8-87D87E7D0422}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3A14A245-229F-40D7-9CE8-87D87E7D0422}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3A14A245-229F-40D7-9CE8-87D87E7D0422}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36CBDB88-A297-4578-A275-8EB77A0EE79E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36CBDB88-A297-4578-A275-8EB77A0EE79E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36CBDB88-A297-4578-A275-8EB77A0EE79E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36CBDB88-A297-4578-A275-8EB77A0EE79E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
