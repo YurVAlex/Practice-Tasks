@@ -8,6 +8,10 @@ namespace Wallet;
 
 internal class Coin
 {
+    
+
+
+
     public string Name { get; set; }
 
     public decimal Price
@@ -15,10 +19,14 @@ internal class Coin
         get; set;
     }
 
+    
+
     public Coin(string name, decimal currentPrice)
     {
         
     }
+
+
 
     private async Task <decimal> GetCurrentPriceAsync(string name)
     { 
