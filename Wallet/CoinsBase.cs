@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -8,7 +9,18 @@ namespace Wallet
 {
     internal static class CoinsBase
     {
-        private static List<Coin> _coinsBase = [];
+        private static List<Coin> _coinsBase =
+        {
+            { solana, CoingeckoClient.Currency[solana] }
+            kardiachain,
+            algorand,
+            wax,
+            kira-network,
+            rmrk,
+            launchpool,
+            boson-protocol,
+            moonriver
+        };
 
         internal static void AddToBaseCoin(Coin coin)
         { 

@@ -23,7 +23,8 @@ internal class Coin
 
     public Coin(string name, decimal currentPrice)
     {
-        
+        Name = name;
+        Price = currentPrice;
     }
 
 
