@@ -9,10 +9,7 @@ public class Program
             PooledConnectionLifetime = TimeSpan.FromMinutes(2) 
         };
 
-        Timer timer1 = new Timer(async (_) => 
-        await CoingeckoClient.FetchPrices(socketsHandler), null, 0, 60000);
-
-        await Task.Delay(2000);
+        await CoingeckoClient.FetchPrices(socketsHandler);
 
         var sol = new Coin(CoinsBase.CoinsList[0]);
         var algo = new Coin(CoinsBase.CoinsList[2]);
@@ -26,11 +23,10 @@ public class Program
         wallet2.AddCoins(sol, (decimal)5.25);
         wallet2.AddCoins(algo, (decimal)325.57);
 
-        Timer timer2 = new Timer((_) => wallet1.ShowKeeping(), null, 0, 60000);
+        await Task.Delay(60000);
 
-        await Task.Delay(2000);
-
-        Timer timer3 = new Timer((_) => wallet2.ShowKeeping(), null, 0, 60000);
+        await TimerLoop.LaunchBatchCombineAsync(60000, CoingeckoClient.FetchPrices(socketsHandler),
+            wallet1.ShowKeeping, wallet2.ShowKeeping);
 
         Console.ReadLine();
     }
