@@ -13,8 +13,14 @@ internal class Billfold
 
     public void AddCoins(Coin coin, decimal amount)
     {
-        var value = _coins[coin];
-        value += amount;
+        if (_coins.ContainsKey(coin))
+        {
+            _coins[coin] += amount;
+        }
+        else
+        {
+            _coins.Add(coin, amount);
+        }
     }
 
     public void WithdrawCoins(Coin coin, decimal amount)
@@ -28,7 +34,7 @@ internal class Billfold
         int number = 0;
         decimal total = 0;  
 
-        Console.WriteLine("Wallet keeping:");
+        Console.WriteLine("\nWallet keeping:");
 
         foreach (var coin in _coins)
         {
@@ -38,17 +44,6 @@ internal class Billfold
             total += subTotal;
         }
 
-        Console.WriteLine($"\n Overall worth: {total}");
-    }
-
-    public override string ToString()
-    {
-        var sb = new StringBuilder();
-
-        foreach (var coin in _coins)
-        {
-            sb.AppendLine( coin.Key.Name );
-        }
-        return sb.ToString();
+        Console.WriteLine($"\nOverall worth: {total}");
     }
 }

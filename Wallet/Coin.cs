@@ -1,36 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Wallet;
+﻿namespace Wallet;
 
 internal class Coin
 {
-    
-
-
-
     public string Name { get; set; }
 
-    public decimal Price
+    public decimal Price { get; set; }
+
+    public Coin(string name)
     {
-        get; set;
+        if (CoingeckoClient.Currency.ContainsKey(name))
+        {
+            Name = name;
+            Price = CoingeckoClient.Currency[name];
+        }
+        else
+        {
+            throw new Exception($"The coin with name \"{name}\" are not in the base!");
+        }
     }
 
-    
-
-    public Coin(string name, decimal currentPrice)
+    public override string ToString()
     {
-        Name = name;
-        Price = currentPrice;
-    }
-
-
-
-    private async Task <decimal> GetCurrentPriceAsync(string name)
-    { 
-    
+        return $"{Name} (Current price: {Price}) ";
     }
 }

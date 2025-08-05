@@ -9,35 +9,33 @@ namespace Wallet
 {
     internal static class CoinsBase
     {
-        private static List<Coin> _coinsBase =
-        {
-            { solana, CoingeckoClient.Currency[solana] }
-            kardiachain,
-            algorand,
-            wax,
-            kira-network,
-            rmrk,
-            launchpool,
-            boson-protocol,
-            moonriver
-        };
+        public static List<string> CoinsList { get; set; } =
+        [
+            "solana", 
+            "kardiachain",
+            "algorand",
+            "wax",
+            "kira-network",
+            "rmrk",
+            "launchpool",
+            "boson-protocol",
+            "moonriver"
+        ];
 
-        internal static void AddToBaseCoin(Coin coin)
+        internal static void AddToBaseCoin(string coinName)
         { 
-            _coinsBase.Add(coin); 
+            CoinsList.Add(coinName); 
         }
 
         public static void RemoveCoinByName(string name)
         {
-            var temp = _coinsBase.FirstOrDefault(_ => (_.Name == name));
-
-            if (temp == null)
+            if (CoinsList.Contains(name) )
             {
-                Console.WriteLine($"Coin with name ({name}) does not exists in base.");
+                CoinsList.Remove(name);
             }
             else
-            { 
-                _coinsBase.Remove(temp);
+            {
+                Console.WriteLine($"Coin with name ({name}) does not exists in base.");
             }
         }
 
@@ -45,9 +43,9 @@ namespace Wallet
         {
             var sb = new StringBuilder();
 
-            foreach (Coin coin in _coinsBase)
+            foreach (var coinName in CoinsList)
             {
-                sb.Append(coin.Name + ",");
+                sb.Append(coinName + ",");
             }
             return sb.ToString();
         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -29,14 +30,23 @@ internal static class CoingeckoClient
 
 
             Console.Clear();
-            Console.WriteLine("Prises in USD:");
+            Console.WriteLine("Launched HTTP client to get current prices from Coingecko.com...");
 
             string[] strings = response.Split(',');
             foreach (string item in strings)
             {
                 string[] tempSubString = item.Split(':');
+                string returnedName = tempSubString[0].Trim('}', '}', '{', '\\', '"');
+                decimal returnedPrice = Convert.ToDecimal(tempSubString[2].Trim('}'), CultureInfo.InvariantCulture);
 
-                Currency.Add(tempSubString[0].Trim('}'), decimal.Parse(tempSubString[2].Trim('}')));
+                if (Currency.ContainsKey(returnedName))
+                {
+                    Currency[returnedName] = returnedPrice;
+                }
+                else
+                {
+                    Currency.Add(returnedName, returnedPrice);
+                }
             }
 
             Console.WriteLine("Press any key to exit...");
