@@ -1,0 +1,11 @@
+10.08.2025 18:47:27 Created: D:\Temp\Текстовый документ.txt
+10.08.2025 18:54:49 Changed: D:\Temp\Текстовый документ.txt
+10.08.2025 18:58:32 Renamed: D:\Temp\Текстовый документ.txt to D:\Temp\TestTXT.txt
+10.08.2025 19:51:37 Changed: D:\Temp\TestTXT.txt
+10.08.2025 19:53:12 Created: D:\Temp\Текстовый документ.txt
+10.08.2025 19:53:23 Renamed: D:\Temp\Текстовый документ.txt to D:\Temp\Test 2.txt
+10.08.2025 19:53:56 Changed: D:\Temp\Test 2.txt
+10.08.2025 19:54:07 Renamed: D:\Temp\TestTXT.txt to D:\Temp\Test 1.txt
+10.08.2025 19:54:25 Changed: D:\Temp\Test 1.txt
+10.08.2025 19:55:09 Changed: D:\Temp\Test 2.txt
+10.08.2025 19:55:12 Changed: D:\Temp\Test 1.txt
