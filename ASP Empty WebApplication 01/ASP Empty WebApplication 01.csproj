@@ -7,8 +7,4 @@
     <RootNamespace>ASP_Empty_WebApplication_01</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Folder Include="wwwroot\" />
-  </ItemGroup>
-
 </Project>

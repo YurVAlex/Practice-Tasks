@@ -56,6 +56,8 @@ app.MapPost("/", async (context) =>
 
         data.Add(result);
 
+        File.AppendAllText(builder.Environment.WebRootPath + "/Users.html", "<h1>" + result + "</h1>");
+
         await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/index.html");
     });
 
@@ -63,6 +65,9 @@ app.MapPost("/", async (context) =>
 app.MapGet("/", () => Results.Content("<h1>Registration Server is Running</h1><p>Open index.html and submit the form to POST data here.</p>", contentType: "text/html"));
 
 app.MapGet("/data", () => Results.Content(GetData(), contentType: "text/html"));
+
+app.MapGet("/users", async (context) => await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Users.html"));
+
 
 app.MapFallbackToFile("index.html");
 
