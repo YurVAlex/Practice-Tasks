@@ -9,9 +9,10 @@
             var content = new StringContent("What is HTTP?");
 
             using HttpRequestMessage request = new();
-            request.Method = HttpMethod.Get;
+            request.Method = HttpMethod.Post;
             request.RequestUri = new Uri("https://www.google.com");
             request.Content = content;
+            request.Content.Headers.Add("SecreteCode", "Anything"); ;
 
             using HttpResponseMessage response = await httpClient.SendAsync(request);
             Console.WriteLine($"Status: {response.StatusCode}\n");

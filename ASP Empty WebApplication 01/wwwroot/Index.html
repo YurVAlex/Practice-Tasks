@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>METANIT.COM</title>
+    <style>
+    input {width: 150px;}
+    input:invalid {border-color: red; }
+    input:valid { border-color: green;}
+    </style>
+</head>
+<body>
+<form id="registerForm" name="registerForm" method="post" action="http://localhost:5146">
+<p>
+    <label for="username">Username:</label><br>
+    <input id="username" name="username" maxlength="20" minlength="3" required autofocus>
+</p>
+<p>
+    <label for="email">Email:</label><br>
+    <input type="email" id="email" name="email" required>
+</p>
+<p>
+    <label for="age">Age:</label><br>
+    <input type="number" id="age" name="age" min="1" max="110" value="18">
+</p>
+<button type="submit" id="submit" name="submit">Register</button>
+
+</form>
+
+<button onclick="showRegistrations()" id="registrations" name="registrations">Registrations</button>
+
+<script>
+function showRegistrations(){
+  window.open("http://localhost:5146/data", "_blank", "width=600,height=400,left=500,top=200");
+}
+
+console.log("href:", location.href);
+console.log("path:", location.pathname);
+console.log("origin:", location.origin);
+console.log("protocol:", location.protocol);
+console.log("port:", location.port);
+console.log("host:", location.host);
+console.log("hostname", location.hostname);
+console.log("hash:", location.hash);
+console.log("search:", location.search);
+</script>
+</body>
+</html>
