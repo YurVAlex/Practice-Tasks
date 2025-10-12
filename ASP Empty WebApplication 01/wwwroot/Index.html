@@ -94,7 +94,7 @@
 <body>
     <div class="form-container">
         <h1>User Registration</h1>
-        <form id="registerForm" name="registerForm" method="post" action="http://localhost:5146">
+        <form id="registerForm" name="registerForm" action="#" onsubmit="submitForm(event)">
             <div class="form-group">
                 <label for="name">Name:</label>
                 <input type="text" id="name" name="name" maxlength="30" minlength="3" required autofocus>
@@ -112,7 +112,7 @@
             <div class="form-group">
                 <label for="password">Password:</label>
                 <input type="password" id="password" name="password" required>
-                <div class="password-requirements">Password is required.</div>
+                <div class="password-requirements">Password must contain: 8-128 characters, one uppercase letter, one lowercase letter, one number, one special character.</div>
                 <div class="error-message" id="password-error">Password is required.</div>
                 <div class="success-message" id="password-success">✓ Password is valid</div>
             </div>
@@ -156,19 +156,33 @@
             const emailError = document.getElementById('email-error');
             const emailSuccess = document.getElementById('email-success');
             
+            // Clear any previous custom validity
+            emailInput.setCustomValidity('');
+            
+            if (emailInput.value.length === 0) {
+                emailError.style.display = 'none';
+                emailSuccess.style.display = 'none';
+                return false;
+            }
+            
             if (emailInput.value.length > 255) {
                 emailInput.setCustomValidity('Email address is too long (maximum 255 characters).');
                 emailError.textContent = 'Email address is too long (maximum 255 characters).';
                 emailError.style.display = 'block';
                 emailSuccess.style.display = 'none';
                 return false;
-            } else if (!emailInput.checkValidity()) {
+            }
+            
+            // Use a more comprehensive email regex pattern
+            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+            
+            if (!emailRegex.test(emailInput.value)) {
                 emailInput.setCustomValidity('Please enter a valid email address.');
+                emailError.textContent = 'Please enter a valid email address.';
                 emailError.style.display = 'block';
                 emailSuccess.style.display = 'none';
                 return false;
             } else {
-                emailInput.setCustomValidity('');
                 emailError.style.display = 'none';
                 emailSuccess.style.display = 'block';
                 return true;
@@ -180,13 +194,42 @@
             const passwordError = document.getElementById('password-error');
             const passwordSuccess = document.getElementById('password-success');
             
-            if (passwordInput.value.length === 0) {
-                passwordInput.setCustomValidity('Password is required.');
+            const password = passwordInput.value;
+            
+            // Clear any previous custom validity
+            passwordInput.setCustomValidity('');
+            
+            if (password.length === 0) {
+                passwordError.textContent = 'Password is required.';
+                passwordError.style.display = 'block';
+                passwordSuccess.style.display = 'none';
+                return false;
+            }
+            
+            // Check password requirements
+            const requirements = {
+                length: password.length >= 8 && password.length <= 128,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                digit: /[0-9]/.test(password),
+                special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+            };
+            
+            const failedRequirements = [];
+            if (!requirements.length) failedRequirements.push('8-128 characters');
+            if (!requirements.uppercase) failedRequirements.push('one uppercase letter');
+            if (!requirements.lowercase) failedRequirements.push('one lowercase letter');
+            if (!requirements.digit) failedRequirements.push('one number');
+            if (!requirements.special) failedRequirements.push('one special character');
+            
+            if (failedRequirements.length > 0) {
+                const errorMessage = `Password must contain: ${failedRequirements.join(', ')}.`;
+                passwordInput.setCustomValidity(errorMessage);
+                passwordError.textContent = errorMessage;
                 passwordError.style.display = 'block';
                 passwordSuccess.style.display = 'none';
                 return false;
             } else {
-                passwordInput.setCustomValidity('');
                 passwordError.style.display = 'none';
                 passwordSuccess.style.display = 'block';
                 return true;
@@ -225,34 +268,95 @@
         }
 
         // Event listeners
-        document.getElementById('name').addEventListener('input', validateName);
-        document.getElementById('name').addEventListener('blur', validateName);
+        document.getElementById('name').addEventListener('input', function() {
+            validateName();
+            validateForm(); // Update button state
+        });
+        document.getElementById('name').addEventListener('blur', function() {
+            validateName();
+            validateForm(); // Update button state
+        });
         
-        document.getElementById('email').addEventListener('input', validateEmail);
-        document.getElementById('email').addEventListener('blur', validateEmail);
+        document.getElementById('email').addEventListener('input', function() {
+            validateEmail();
+            validateForm(); // Update button state
+        });
+        document.getElementById('email').addEventListener('blur', function() {
+            validateEmail();
+            validateForm(); // Update button state
+        });
         
         document.getElementById('password').addEventListener('input', function() {
             validatePassword();
             validateConfirmPassword(); // Re-validate confirm password when password changes
+            validateForm(); // Update button state
         });
-        document.getElementById('password').addEventListener('blur', validatePassword);
+        document.getElementById('password').addEventListener('blur', function() {
+            validatePassword();
+            validateForm(); // Update button state
+        });
         
-        document.getElementById('confirmPassword').addEventListener('input', validateConfirmPassword);
-        document.getElementById('confirmPassword').addEventListener('blur', validateConfirmPassword);
+        document.getElementById('confirmPassword').addEventListener('input', function() {
+            validateConfirmPassword();
+            validateForm(); // Update button state
+        });
+        document.getElementById('confirmPassword').addEventListener('blur', function() {
+            validateConfirmPassword();
+            validateForm(); // Update button state
+        });
 
-        // Form submission validation
-        document.getElementById('registerForm').addEventListener('submit', function(e) {
+        // Form submission function
+        async function submitForm(event) {
+            event.preventDefault();
+            
             if (!validateForm()) {
-                e.preventDefault();
                 return false;
             }
-        });
+            
+            // Get form values
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // URL encode the parameters to handle special characters
+            const encodedName = encodeURIComponent(name);
+            const encodedEmail = encodeURIComponent(email);
+            const encodedPassword = encodeURIComponent(password);
+            
+            // Construct the URL with route parameters
+            const url = `http://localhost:5146/register/${encodedName}/${encodedEmail}/${encodedPassword}`;
+            
+            try {
+                console.log('Sending registration request to:', url);
+                // Fetch to the constructed URL
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const newUser = await response.json();
+                    alert(`Registration successful! User ID: ${newUser.id}`);
+                    // Optionally clear the form
+                    document.getElementById('registerForm').reset();
+                    validateForm(); // Reset button state
+                } else {
+                    const errorData = await response.json();
+                    alert(`Registration failed: ${errorData.error || 'Please try again.'}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Registration failed. Please try again.');
+            }
+        }
 
         // Initial validation
         validateForm();
 
         function showRegistrations() {
-            window.open("http://localhost:5146/data", "_blank", "width=600,height=400,left=500,top=200");
+            window.open("http://localhost:5146/users", "_blank", "width=400,height=1200,left=1000,top=100");
         }
     </script>
 </body>

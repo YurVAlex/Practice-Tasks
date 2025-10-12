@@ -28,8 +28,12 @@ public class User
 
     /// <summary>
     /// User's password (Note: In a real application, this should always be stored as a hash).
+    /// Requirements: 8-128 characters, must contain uppercase, lowercase, digit, and special character.
     /// </summary>
     [Required]
+    [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 128 characters long.")]
+    [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':""\\|,.<>\/?]).{8,128}$", 
+        ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.")]
     public string Password { get; set; }
 
     /// <summary>
