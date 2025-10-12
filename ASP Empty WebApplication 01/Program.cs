@@ -1,14 +1,12 @@
 using System;
 using System.Text;
 using ASP_Empty_WebApplication_01.Models;
+using ASP_Empty_WebApplication_01.Data;
+using Microsoft.EntityFrameworkCore;
 
 // This file defines the complete ASP.NET Core Minimal API server for user registration.
 
-// --- 1. Define the Data Structure (Model) ---
-// Static list to store user registrations
-List<User> registeredUsers = [];
-
-string GenerateUsersHtml()
+string GenerateUsersHtml(List<User> users)
 {
     StringBuilder sb = new StringBuilder();
     sb.AppendLine("<!DOCTYPE html>");
@@ -28,13 +26,13 @@ string GenerateUsersHtml()
     sb.AppendLine("</head>");
     sb.AppendLine("<body>");
     sb.AppendLine("    <h1>Registered Users</h1>");
-    sb.AppendLine($"    <div class='registration-count'>Total Registrations: {registeredUsers.Count}</div>");
+    sb.AppendLine($"    <div class='registration-count'>Total Registrations: {users.Count}</div>");
 
-    foreach (var user in registeredUsers)
+    foreach (var user in users)
     {
         sb.AppendLine("    <div class='user-card'>");
         sb.AppendLine($"        <div class='user-name'>{user.Name}</div>");
-        sb.AppendLine($"        <div class='user-email'>{user.E_mail}</div>");
+        sb.AppendLine($"        <div class='user-email'>{user.Email}</div>");
         sb.AppendLine($"        <div class='user-id'>ID: {user.ID}</div>");
         sb.AppendLine("    </div>");
     }
@@ -44,11 +42,12 @@ string GenerateUsersHtml()
     return sb.ToString();
 }
 
-void UpdateUsersHtmlFile(string webRootPath)
+async Task UpdateUsersHtmlFileAsync(string webRootPath, ApplicationDbContext context)
 {
     try
     {
-        var htmlContent = GenerateUsersHtml();
+        var users = await context.Users.ToListAsync();
+        var htmlContent = GenerateUsersHtml(users);
         File.WriteAllText(Path.Combine(webRootPath, "Users.html"), htmlContent);
     }
     catch (Exception ex)
@@ -60,10 +59,21 @@ void UpdateUsersHtmlFile(string webRootPath)
 // --- 2. Build the Web Application ---
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Entity Framework Core with SQLite
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=users.db"));
+
 // Configure Kestrel to use the specific port (http://localhost:5146)
 builder.WebHost.UseUrls("http://localhost:5146");
 
 var app = builder.Build();
+
+// Ensure database is created and apply migrations
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    context.Database.EnsureCreated();
+}
 
 app.UseRouting();
 app.UseDefaultFiles();
@@ -77,7 +87,7 @@ app.MapGet("/", async (context) =>
 
 // Registration endpoint - handle user registration with route-level validation
 app.MapPost("/register/{name:minlength(3):maxlength(30)}/{email:minlength(5):maxlength(255)}/{password:minlength(8):maxlength(128)}", 
-    (string name, string email, string password, HttpContext context) =>
+    async (string name, string email, string password, HttpContext context, ApplicationDbContext dbContext) =>
 {
     try
     {
@@ -132,34 +142,35 @@ app.MapPost("/register/{name:minlength(3):maxlength(30)}/{email:minlength(5):max
             });
         }
         
-        // 4. Business logic validation: Check for duplicate email
-        if (registeredUsers.Any(u => u.E_mail.Equals(decodedEmail.Trim(), StringComparison.OrdinalIgnoreCase)))
+        // 4. Business logic validation: Check for duplicate email in database
+        var existingUser = await dbContext.Users
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == decodedEmail.Trim().ToLower());
+        
+        if (existingUser != null)
         {
             return Results.Conflict(new { error = "User with this email already exists." });
         }
         
-        // 5. Create and store the user
+        // 5. Create and store the user in database
         var newUser = new User
         {
             Name = decodedName.Trim(),
-            E_mail = decodedEmail.Trim(),
+            Email = decodedEmail.Trim(),
             Password = decodedPassword
         };
         
-        // Add to the static list
-        registeredUsers.Add(newUser);
+        // Add to the database
+        dbContext.Users.Add(newUser);
+        await dbContext.SaveChangesAsync();
         
-        // Update the Users.html file
-        UpdateUsersHtmlFile(builder.Environment.WebRootPath);
-        
-        Console.WriteLine($"New user registered: {newUser.Name} ({newUser.E_mail}) - ID: {newUser.ID}");
+        Console.WriteLine($"New user registered: {newUser.Name} ({newUser.Email}) - ID: {newUser.ID}");
         
         // Return the created user as JSON
         return Results.Json(new
         {
             id = newUser.ID,
             name = newUser.Name,
-            email = newUser.E_mail,
+            email = newUser.Email,
             message = "Registration successful!"
         });
     }
@@ -171,17 +182,26 @@ app.MapPost("/register/{name:minlength(3):maxlength(30)}/{email:minlength(5):max
 });
 
 // Users endpoint - display registered users
-app.MapGet("/users", async (context) => 
-    await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Users.html"));
+app.MapGet("/users", async (HttpContext context, ApplicationDbContext dbContext) =>
+{
+    // Update the Users.html file
+    await UpdateUsersHtmlFileAsync(builder.Environment.WebRootPath, dbContext);
+    await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Users.html");
+    
+});
 
 // API endpoint to get all registered users as JSON
-app.MapGet("/api/users", () => Results.Json(registeredUsers.Select(u => new
+app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
 {
-    id = u.ID,
-    name = u.Name,
-    email = u.E_mail,
-    registrationDate = DateTime.Now // You might want to add a registration date field to User model
-})));
+    var users = await dbContext.Users.ToListAsync();
+    return Results.Json(users.Select(u => new
+    {
+        id = u.ID,
+        name = u.Name,
+        email = u.Email,
+        registrationDate = DateTime.Now // You might want to add a registration date field to User model
+    }));
+});
 
 // Fallback to serve the registration form for any other routes
 app.MapFallbackToFile("Index.html");

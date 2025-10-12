@@ -24,7 +24,7 @@ public class User
     /// </summary>
     [Required]
     [StringLength(30, MinimumLength = 3)]
-    public string Name { get; set; }
+    public required string Name { get; set; }
 
     /// <summary>
     /// User's password (Note: In a real application, this should always be stored as a hash).
@@ -34,7 +34,7 @@ public class User
     [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 128 characters long.")]
     [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':""\\|,.<>\/?]).{8,128}$", 
         ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.")]
-    public string Password { get; set; }
+    public required string Password { get; set; }
 
     /// <summary>
     /// User's email address.
@@ -43,7 +43,7 @@ public class User
     [Required]
     [EmailAddress]
     [StringLength(255)] // Standard length for email addresses
-    public string E_mail { get; set; }
+    public required string Email { get; set; }
 
     // --- JSON Text Fields for Complex Data ---
 
