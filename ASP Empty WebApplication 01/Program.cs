@@ -1,11 +1,19 @@
 using System;
 using System.Text;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using ASP_Empty_WebApplication_01.Models;
 using ASP_Empty_WebApplication_01.Data;
-using Microsoft.EntityFrameworkCore;
 
-// This file defines the complete ASP.NET Core Minimal API server for user registration.
+// This file defines the complete ASP.NET Core Minimal API server for user registration and login.
 
+// --- Helper Functions ---
+
+/// <summary>
+/// Generates the HTML content for displaying all registered users.
+/// </summary>
+/// <param name="users">A list of User entities.</param>
+/// <returns>HTML string for the users page.</returns>
 string GenerateUsersHtml(List<User> users)
 {
     StringBuilder sb = new StringBuilder();
@@ -20,21 +28,25 @@ string GenerateUsersHtml(List<User> users)
     sb.AppendLine("        .user-name { font-weight: bold; color: #333; font-size: 18px; }");
     sb.AppendLine("        .user-email { color: #666; margin: 5px 0; }");
     sb.AppendLine("        .user-id { color: #888; font-size: 12px; }");
-    sb.AppendLine("        .registration-count { background-color: #4CAF50; color: white; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }");
-    sb.AppendLine("        h1 { text-align: center; color: #333; }");
     sb.AppendLine("    </style>");
     sb.AppendLine("</head>");
     sb.AppendLine("<body>");
     sb.AppendLine("    <h1>Registered Users</h1>");
-    sb.AppendLine($"    <div class='registration-count'>Total Registrations: {users.Count}</div>");
 
-    foreach (var user in users)
+    if (users.Count == 0)
     {
-        sb.AppendLine("    <div class='user-card'>");
-        sb.AppendLine($"        <div class='user-name'>{user.Name}</div>");
-        sb.AppendLine($"        <div class='user-email'>{user.Email}</div>");
-        sb.AppendLine($"        <div class='user-id'>ID: {user.ID}</div>");
-        sb.AppendLine("    </div>");
+        sb.AppendLine("    <p>No users registered yet.</p>");
+    }
+    else
+    {
+        foreach (var user in users)
+        {
+            sb.AppendLine("    <div class='user-card'>");
+            sb.AppendLine($"        <p class='user-name'>{user.Name}</p>");
+            sb.AppendLine($"        <p class='user-email'>Email: {user.Email}</p>");
+            sb.AppendLine($"        <p class='user-id'>ID: {user.ID}</p>");
+            sb.AppendLine("    </div>");
+        }
     }
 
     sb.AppendLine("</body>");
@@ -42,124 +54,75 @@ string GenerateUsersHtml(List<User> users)
     return sb.ToString();
 }
 
-async Task UpdateUsersHtmlFileAsync(string webRootPath, ApplicationDbContext context)
+/// <summary>
+/// Updates the static Users.html file with the current list of registered users.
+/// </summary>
+/// <param name="webRootPath">The path to the wwwroot folder.</param>
+/// <param name="dbContext">The application's database context.</param>
+/// <returns>A Task representing the asynchronous operation.</returns>
+async Task UpdateUsersHtmlFileAsync(string webRootPath, ApplicationDbContext dbContext)
 {
-    try
-    {
-        var users = await context.Users.ToListAsync();
-        var htmlContent = GenerateUsersHtml(users);
-        File.WriteAllText(Path.Combine(webRootPath, "Users.html"), htmlContent);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error updating Users.html: {ex.Message}");
-    }
+    var users = await dbContext.Users.ToListAsync();
+    string htmlContent = GenerateUsersHtml(users);
+    string filePath = Path.Combine(webRootPath, "Users.html");
+    await File.WriteAllTextAsync(filePath, htmlContent);
 }
 
-// --- 2. Build the Web Application ---
+// --- Application Setup ---
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Entity Framework Core with SQLite
+// Configure SQLite database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=users.db"));
-
-// Configure Kestrel to use the specific port (http://localhost:5146)
-builder.WebHost.UseUrls("http://localhost:5146");
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
-// Ensure database is created and apply migrations
+// Ensure the database is created and migrations are applied
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    context.Database.EnsureCreated();
+    var services = scope.ServiceProvider;
+    var dbContext = services.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
 }
 
-app.UseRouting();
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Configure the HTTP request pipeline.
+app.UseHttpsRedirection();
+app.UseStaticFiles(); // Enable serving static files from wwwroot
 
-// --- 3. Define Endpoints ---
+// --- API Endpoints ---
 
-// Root endpoint - serve the registration form
-app.MapGet("/", async (context) => 
-    await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Index.html"));
-
-// Registration endpoint - handle user registration with route-level validation
-app.MapPost("/register/{name:minlength(3):maxlength(30)}/{email:minlength(5):maxlength(255)}/{password:minlength(8):maxlength(128)}", 
-    async (string name, string email, string password, HttpContext context, ApplicationDbContext dbContext) =>
+// Registration endpoint
+app.MapPost("/register/{name}/{email}/{password}", async (string name, string email, string password, ApplicationDbContext dbContext) =>
 {
+    // 1. Construct a temporary user for validation
+    var newUser = new User
+    {
+        Name = name,
+        Email = email,
+        Password = password
+    };
+
+    // 2. Perform validation against data annotations in the User model
+    var validationContext = new ValidationContext(newUser, serviceProvider: null, items: null);
+    var validationResults = new List<ValidationResult>();
+    bool isValid = Validator.TryValidateObject(newUser, validationContext, validationResults, true);
+
+    if (!isValid)
+    {
+        var errors = validationResults.Select(r => r.ErrorMessage).ToList();
+        return Results.BadRequest(new { error = "Validation failed.", details = errors });
+    }
+
     try
     {
-        // URL decode the parameters to handle special characters
-        var decodedName = Uri.UnescapeDataString(name);
-        var decodedEmail = Uri.UnescapeDataString(email);
-        var decodedPassword = Uri.UnescapeDataString(password);
-        
-        // Route-level validation constraints (matching model and client levels)
-        
-        // 1. Name validation: 3-30 characters, no whitespace-only
-        if (string.IsNullOrWhiteSpace(decodedName) || decodedName.Trim().Length < 3 || decodedName.Trim().Length > 30)
-        {
-            return Results.BadRequest(new { error = "Name must be between 3 and 30 characters long." });
-        }
-        
-        // 2. Email validation: valid email format, max 255 characters
-        if (string.IsNullOrWhiteSpace(decodedEmail) || decodedEmail.Trim().Length > 255)
-        {
-            return Results.BadRequest(new { error = "Email address is too long (maximum 255 characters)." });
-        }
-        
-        // Email format validation using regex (matching client-side validation)
-        var emailRegex = @"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$";
-        if (!System.Text.RegularExpressions.Regex.IsMatch(decodedEmail.Trim(), emailRegex))
-        {
-            return Results.BadRequest(new { error = "Please enter a valid email address." });
-        }
-        
-        // 3. Password validation: 8-128 characters with complexity requirements
-        if (string.IsNullOrWhiteSpace(decodedPassword) || decodedPassword.Length < 8 || decodedPassword.Length > 128)
-        {
-            return Results.BadRequest(new { error = "Password must be between 8 and 128 characters long." });
-        }
-        
-        // Password complexity validation (matching model and client levels)
-        var hasUppercase = System.Text.RegularExpressions.Regex.IsMatch(decodedPassword, @"[A-Z]");
-        var hasLowercase = System.Text.RegularExpressions.Regex.IsMatch(decodedPassword, @"[a-z]");
-        var hasDigit = System.Text.RegularExpressions.Regex.IsMatch(decodedPassword, @"[0-9]");
-        var hasSpecial = System.Text.RegularExpressions.Regex.IsMatch(decodedPassword, @"[!@#$%^&*()_+\-=\[\]{};':""\\|,.<>\/?]");
-        
-        if (!hasUppercase || !hasLowercase || !hasDigit || !hasSpecial)
-        {
-            var missingRequirements = new List<string>();
-            if (!hasUppercase) missingRequirements.Add("one uppercase letter");
-            if (!hasLowercase) missingRequirements.Add("one lowercase letter");
-            if (!hasDigit) missingRequirements.Add("one number");
-            if (!hasSpecial) missingRequirements.Add("one special character");
-            
-            return Results.BadRequest(new { 
-                error = $"Password must contain: {string.Join(", ", missingRequirements)}." 
-            });
-        }
-        
-        // 4. Business logic validation: Check for duplicate email in database
-        var existingUser = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == decodedEmail.Trim().ToLower());
-        
-        if (existingUser != null)
+        // 3. Check for existing user with the same email
+        if (await dbContext.Users.AnyAsync(u => u.Email == newUser.Email))
         {
             return Results.Conflict(new { error = "User with this email already exists." });
         }
-        
-        // 5. Create and store the user in database
-        var newUser = new User
-        {
-            Name = decodedName.Trim(),
-            Email = decodedEmail.Trim(),
-            Password = decodedPassword
-        };
-        
-        // Add to the database
+
+        // 4. Save to database
         dbContext.Users.Add(newUser);
         await dbContext.SaveChangesAsync();
         
@@ -181,7 +144,73 @@ app.MapPost("/register/{name:minlength(3):maxlength(30)}/{email:minlength(5):max
     }
 });
 
-// Users endpoint - display registered users
+// ***************************************************************
+// NEW: Login endpoint
+// ***************************************************************
+app.MapPost("/login/{email}/{password}", async (string email, string password, ApplicationDbContext dbContext) =>
+{
+    // 1. Validation Setup (using User model's constraints)
+    var loginAttemptUser = new User 
+    {
+        // Name is required by the User model, so we provide a dummy value 
+        // to allow validation of Email and Password to proceed.
+        Name = "LoginAttempt", 
+        Email = email,
+        Password = password
+    };
+    
+    var validationContext = new ValidationContext(loginAttemptUser, serviceProvider: null, items: null);
+    var validationResults = new List<ValidationResult>();
+    
+    // Check if the provided email/password strings satisfy the model's data annotations
+    bool isValid = Validator.TryValidateObject(loginAttemptUser, validationContext, validationResults, true);
+
+    if (!isValid)
+    {
+        // Extract validation errors and return 400 Bad Request
+        var errors = validationResults.Select(r => r.ErrorMessage).ToList();
+        Console.WriteLine($"Login validation failed: {string.Join(", ", errors)}");
+        return Results.BadRequest(new { error = "Invalid data format.", details = errors });
+    }
+
+    try
+    {
+        // 2. Database Lookup
+        // Find the user by both Email and (plain text) Password
+        // NOTE: In a production app, the password should be HASHED in the DB and verified using a hash comparison!
+        var user = await dbContext.Users
+            .FirstOrDefaultAsync(u => u.Email == email && u.Password == password);
+
+        if (user == null)
+        {
+            // 3. Login Failed
+            Console.WriteLine($"Login failed for email: {email} (Invalid credentials)");
+            // Use Unauthorized (401) or Forbidden (403) for failed authentication/authorization
+            return Results.Unauthorized();
+        }
+        
+        // 4. Login Successful
+        Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}");
+        
+        // Return the essential user details
+        return Results.Json(new
+        {
+            id = user.ID,
+            name = user.Name,
+            email = user.Email,
+            message = "Login successful!"
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error during login: {ex.Message}");
+        // Return 500 Internal Server Error for unhandled exceptions
+        return Results.Problem("An internal server error occurred during login.");
+    }
+});
+
+
+// Users endpoint - display registered users in HTML
 app.MapGet("/users", async (HttpContext context, ApplicationDbContext dbContext) =>
 {
     // Update the Users.html file
@@ -203,8 +232,11 @@ app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
     }));
 });
 
-// Fallback to serve the registration form for any other routes
-app.MapFallbackToFile("Index.html");
+// Default route to serve the main HTML file
+app.MapGet("/", (HttpContext context) =>
+{
+    context.Response.Redirect("/Index.html");
+    return Task.CompletedTask;
+});
 
 app.Run();
-
