@@ -177,7 +177,7 @@ app.MapPost("/register/{name:minlength(3):maxlength(30)}/{email:minlength(5):max
     catch (Exception ex)
     {
         Console.WriteLine($"Error during registration: {ex.Message}");
-        return Results.Problem("An error occurred during registration.");
+        return Results.Problem($"An error occurred during registration. Server exception: {ex.Message}");
     }
 });
 
