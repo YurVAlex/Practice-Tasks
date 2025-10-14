@@ -1,9 +1,10 @@
-using System;
-using System.Text;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
-using ASP_Empty_WebApplication_01.Models;
 using ASP_Empty_WebApplication_01.Data;
+using ASP_Empty_WebApplication_01.Models;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // This file defines the complete ASP.NET Core Minimal API server for user registration and login.
 
@@ -186,7 +187,7 @@ app.MapPost("/login/{email}/{password}", async (string email, string password, A
             // 3. Login Failed
             Console.WriteLine($"Login failed for email: {email} (Invalid credentials)");
             // Use Unauthorized (401) or Forbidden (403) for failed authentication/authorization
-            return Results.Unauthorized();
+            return Results.BadRequest(new { error = "Invalid e-mail or password."});
         }
         
         // 4. Login Successful

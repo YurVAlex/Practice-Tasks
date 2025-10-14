@@ -578,7 +578,8 @@
                 } else {
                     // Check if the response body is available and parse for error message
                     const errorData = await response.json();
-                    alert(`Login failed: ${errorData.error || 'Invalid credentials or server error. Please try again.'}`);
+                    const errorMessage = errorData.error || 'Invalid credentials or server error. Please try again.';
+                    alert(`Login failed: ${errorMessage}`);
                 }
             } catch (error) {
                 console.error('Login error:', error);
