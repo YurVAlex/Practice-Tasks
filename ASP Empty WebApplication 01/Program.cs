@@ -1,3 +1,4 @@
+using ASP_Empty_WebApplication_01;
 using ASP_Empty_WebApplication_01.Data;
 using ASP_Empty_WebApplication_01.Models;
 using Microsoft.EntityFrameworkCore;
@@ -94,7 +95,7 @@ app.UseStaticFiles(); // Enable serving static files from wwwroot
 // --- API Endpoints ---
 
 // Registration endpoint
-app.MapPost("/register/{name}/{email}/{password}", async (string name, string email, string password, ApplicationDbContext dbContext) =>
+app.MapPost("/register/{name}/{email}/{password}", async (string name, string email, string password, ApplicationDbContext dbContext, HttpContext httpContext) =>
 {
     // 1. Construct a temporary user for validation
     var newUser = new User
@@ -126,8 +127,22 @@ app.MapPost("/register/{name}/{email}/{password}", async (string name, string em
         // 4. Save to database
         dbContext.Users.Add(newUser);
         await dbContext.SaveChangesAsync();
-        
+
+        var session = new Session(newUser.ID);
+        SessionManager.Sessions.Add(session);
+
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,         // Recommended: Prevents client-side JavaScript access (mitigates XSS)
+            SameSite = SameSiteMode.Strict // Recommended for security
+        };
+
+        // 4. **Set the Session ID Cookie
+        // Use httpContext.Response.Cookies.Append to add the cookie to the response headers.
+        httpContext.Response.Cookies.Append("SessionCookieName", session.Id.ToString(), cookieOptions);
+
         Console.WriteLine($"New user registered: {newUser.Name} ({newUser.Email}) - ID: {newUser.ID}");
+
         
         // Return the created user as JSON
         return Results.Json(new
@@ -135,7 +150,7 @@ app.MapPost("/register/{name}/{email}/{password}", async (string name, string em
             id = newUser.ID,
             name = newUser.Name,
             email = newUser.Email,
-            message = "Registration successful!"
+            message = $"Registration successful! Session ID: {session.Id}"
         });
     }
     catch (Exception ex)
