@@ -1,6 +1,7 @@
 using ASP_Empty_WebApplication_01;
 using ASP_Empty_WebApplication_01.Data;
 using ASP_Empty_WebApplication_01.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.ComponentModel.DataAnnotations;
@@ -163,8 +164,19 @@ app.MapPost("/register/{name}/{email}/{password}", async (string name, string em
 // ***************************************************************
 // NEW: Login endpoint
 // ***************************************************************
-app.MapPost("/login/{email}/{password}", async (string email, string password, ApplicationDbContext dbContext) =>
+app.MapPost("/login/{email}/{password}", async (string email, string password, ApplicationDbContext dbContext, HttpContext httpContext) =>
 {
+    Console.WriteLine("Current sessions:");
+    foreach(var session in SessionManager.Sessions)
+    {
+        Console.WriteLine($"User ID: {session.UserID} - session ID: {session.Id}");
+    }
+
+    if (httpContext.Request.Cookies.ContainsKey("SessionCookieName"))
+    {
+        Console.WriteLine($"Session is: {httpContext.Request.Cookies["SessionCookieName"]}");
+    }
+
     // 1. Validation Setup (using User model's constraints)
     var loginAttemptUser = new User 
     {
@@ -180,6 +192,7 @@ app.MapPost("/login/{email}/{password}", async (string email, string password, A
     
     // Check if the provided email/password strings satisfy the model's data annotations
     bool isValid = Validator.TryValidateObject(loginAttemptUser, validationContext, validationResults, true);
+
 
     if (!isValid)
     {
@@ -204,9 +217,23 @@ app.MapPost("/login/{email}/{password}", async (string email, string password, A
             // Use Unauthorized (401) or Forbidden (403) for failed authentication/authorization
             return Results.BadRequest(new { error = "Invalid e-mail or password."});
         }
-        
+
+
+        var session = new Session(user.ID);
+        SessionManager.Sessions.Add(session);
+
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,         // Recommended: Prevents client-side JavaScript access (mitigates XSS)
+            SameSite = SameSiteMode.Strict // Recommended for security
+        };
+
+        // 4. **Set the Session ID Cookie
+        // Use httpContext.Response.Cookies.Append to add the cookie to the response headers.
+        httpContext.Response.Cookies.Append("SessionCookieName", session.Id.ToString(), cookieOptions);
+
         // 4. Login Successful
-        Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}");
+        Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}, session ID; {session.Id.ToString()}");
         
         // Return the essential user details
         return Results.Json(new
@@ -249,10 +276,9 @@ app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
 });
 
 // Default route to serve the main HTML file
-app.MapGet("/", (HttpContext context) =>
+app.MapGet("/", async (context) =>
 {
-    context.Response.Redirect("/Index.html");
-    return Task.CompletedTask;
+    await context.Response.SendFileAsync("wwwroot/Index.html");
 });
 
 app.Run();
