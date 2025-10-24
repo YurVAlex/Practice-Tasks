@@ -3,6 +3,7 @@ using ASP_Empty_WebApplication_01.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Net;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -245,6 +246,10 @@ app.MapPost("/projectUpdate", async (context) =>
     var request = context.Request;
     var cookies = request.Cookies;
 
+    if (cookies != null || cookies.Count == 0)
+    {
+        Console.WriteLine("Cookies - empty.");
+    }
     foreach (var cookie in cookies)
     {
         Console.WriteLine(cookie.Key + " - " + cookie.Value);
