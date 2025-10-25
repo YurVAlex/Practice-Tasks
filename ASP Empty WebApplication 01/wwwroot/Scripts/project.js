@@ -1,0 +1,756 @@
+﻿tailwind.config = {
+    theme: {
+        extend: {
+            colors: {
+                'primary-green': '#065f46',
+                'secondary-green': '#10b981',
+                'overdue-red': '#dc2626',
+            }
+        }
+    }
+}
+
+// Optional: toggle remote fetch-on-load behavior (if your backend exposes a tasks endpoint).
+// If you want to try server-side syncing on load, set to true and supply a matching endpoint.
+const REMOTE_SYNC_ON_LOAD = false;
+const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
+const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendTaskUpdate
+
+// --- Storage keys (version these if you change the shape later) ---
+const STORAGE_KEY_TASKS = 'timeline_tasks_v1';
+const STORAGE_KEY_PROJECT = 'timeline_project_v1';
+
+// Default project and tasks (used when nothing in storage)
+const defaultProject = {
+    name: "Initial Project Timeline",
+    startDate: '2025-10-05',
+    endDate: '2025-12-16',
+    description: "This is the default, initial project description."
+};
+
+const defaultTasks = [
+    {
+        id: 1,
+        name: "Phase 1: Concept & Design",
+        startDate: "2025-10-18",
+        endDate: "2025-11-05",
+        description: "Drafting the initial concept and wireframes.",
+        completed: true
+    },
+    {
+        id: 2,
+        name: "Phase 2: Development (Incomplete)",
+        startDate: "2025-10-07",
+        endDate: "2025-10-20",
+        description: "Core coding and API integration.",
+        completed: false
+    }
+];
+
+// In-memory references (will be initialized from localStorage on load)
+let tasks = [];
+let currentProject = {};
+
+// --- Persistence helpers ---
+function loadTasksFromStorage() {
+    const raw = localStorage.getItem(STORAGE_KEY_TASKS);
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                tasks = parsed;
+                return;
+            }
+        } catch (e) {
+            console.error('Failed to parse stored tasks, resetting to defaults.', e);
+        }
+    }
+    // fallback to defaults
+    tasks = defaultTasks.slice();
+    saveTasksToStorage();
+}
+
+function saveTasksToStorage() {
+    try {
+        localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+    } catch (e) {
+        console.error('Failed to save tasks to localStorage', e);
+    }
+}
+
+function loadProjectFromStorage() {
+    const raw = localStorage.getItem(STORAGE_KEY_PROJECT);
+    if (raw) {
+        try {
+            currentProject = JSON.parse(raw) || defaultProject;
+            return;
+        } catch (e) {
+            console.error('Failed to parse stored project, resetting to default.', e);
+        }
+    }
+    currentProject = Object.assign({}, defaultProject);
+    saveProjectToStorage();
+}
+
+function saveProjectToStorage() {
+    try {
+        localStorage.setItem(STORAGE_KEY_PROJECT, JSON.stringify(currentProject));
+    } catch (e) {
+        console.error('Failed to save project to localStorage', e);
+    }
+}
+
+// --- Network: send single task update to server (keeps behavior from original file) ---
+async function sendTaskUpdate(taskObj) {
+    // If you want to stop sending to the server (e.g., offline-only local storage), you can early-return here.
+    try {
+        const response = await fetch(REMOTE_UPDATE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(taskObj)
+        });
+        // optional: handle server response
+        return response;
+    } catch (error) {
+        console.error('Failed to send task update:', error);
+        // ignore network failure — localStorage remains authoritative
+    }
+}
+
+// Optionally fetch remote tasks and merge onto local storage (not enabled by default)
+async function tryFetchRemoteTasksOnLoad() {
+    if (!REMOTE_SYNC_ON_LOAD) return;
+    try {
+        const res = await fetch(REMOTE_TASKS_ENDPOINT);
+        if (!res.ok) return;
+        const remoteTasks = await res.json();
+        if (Array.isArray(remoteTasks)) {
+            // Very simple merge: prefer remote tasks (could be changed to two-way merge)
+            tasks = remoteTasks;
+            saveTasksToStorage();
+        }
+    } catch (e) {
+        console.warn('Remote tasks fetch failed:', e);
+    }
+}
+
+// --- Helper date functions (unchanged) ---
+const getDayDifference = (date1, date2) => {
+    const oneDay = 1000 * 60 * 60 * 24;
+    const diffTime = date2.getTime() - date1.getTime();
+    return Math.round(diffTime / oneDay);
+};
+
+const dateToISOString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// --- Toast UI helper (unchanged) ---
+const showToast = (message, type = 'info', duration = 4000) => {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+
+    let bgColor = 'bg-gray-800';
+    let iconHtml = '';
+
+    if (type === 'success') {
+        bgColor = 'bg-primary-green';
+        iconHtml = '<svg class="w-5 h-5 mr-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    } else if (type === 'error') {
+        bgColor = 'bg-overdue-red';
+        iconHtml = '<svg class="w-5 h-5 mr-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    } else {
+        bgColor = 'bg-blue-500';
+        iconHtml = '<svg class="w-5 h-5 mr-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    }
+
+    toast.className = `flex items-center px-6 py-3 text-white text-sm font-medium rounded-lg shadow-xl mb-3 transition-all duration-300 transform translate-y-0 opacity-100 ${bgColor}`;
+    toast.style.pointerEvents = 'auto';
+    toast.innerHTML = iconHtml + message;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.replace('opacity-100', 'opacity-0');
+        toast.classList.replace('translate-y-0', 'translate-y-4');
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, duration);
+};
+
+// --- Timeline update logic (slightly modified to persist project changes) ---
+let timelineStartDate = new Date('2025-10-05T00:00:00');
+let timelineEndDate = new Date('2025-12-16T00:00:00');
+let timelineTotalDays = 0;
+
+const checkAndUpdateTimeline = () => {
+    let newTimelineStart = timelineStartDate;
+    let newTimelineEnd = timelineEndDate;
+
+    tasks.forEach(task => {
+        const taskStart = new Date(task.startDate + 'T00:00:00');
+        const taskEnd = new Date(task.endDate + 'T00:00:00');
+
+        if (taskStart < newTimelineStart) {
+            newTimelineStart = taskStart;
+        }
+        if (taskEnd > newTimelineEnd) {
+            newTimelineEnd = taskEnd;
+        }
+    });
+
+    const newStartString = dateToISOString(newTimelineStart);
+    const newEndString = dateToISOString(newTimelineEnd);
+
+    if (newTimelineStart.getTime() !== timelineStartDate.getTime() || newTimelineEnd.getTime() !== timelineEndDate.getTime()) {
+        currentProject.startDate = newStartString;
+        currentProject.endDate = newEndString;
+        saveProjectToStorage();
+        showToast(`Timeline expanded to fit new task! (${newStartString} to ${newEndString})`, 'success');
+        renderTimeline(newStartString, newEndString);
+    } else {
+        renderTasks();
+    }
+};
+
+// --- Project modal behavior (saving project persists to storage) ---
+const openProjectModal = () => {
+    const modal = document.getElementById('project-modal');
+    document.getElementById('project-modal-name').value = currentProject.name;
+    document.getElementById('project-modal-start-date').value = currentProject.startDate;
+    document.getElementById('project-modal-end-date').value = currentProject.endDate;
+    document.getElementById('project-modal-description').value = currentProject.description;
+    document.getElementById('project-modal-status').textContent = '';
+    document.getElementById('project-mode-current').checked = true;
+    updateProjectModalState('current');
+    modal.classList.remove('hidden');
+};
+
+const closeProjectModal = () => {
+    document.getElementById('project-modal').classList.add('hidden');
+};
+
+const updateProjectModalState = (mode) => {
+    const dateFields = document.getElementById('project-date-fields');
+    const descriptionField = document.getElementById('project-description-field');
+    const okButton = document.getElementById('project-modal-ok');
+    const modalName = document.getElementById('project-modal-name');
+
+    if (mode === 'current') {
+        dateFields.classList.remove('hidden');
+        descriptionField.classList.remove('hidden');
+        okButton.textContent = 'OK';
+        modalName.readOnly = false;
+        modalName.classList.remove('bg-gray-100');
+    } else if (mode === 'new') {
+        dateFields.classList.add('hidden');
+        descriptionField.classList.add('hidden');
+        okButton.textContent = 'Create Project';
+        modalName.readOnly = false;
+        modalName.value = '';
+        modalName.classList.remove('bg-gray-100');
+    }
+};
+
+const handleProjectModalOk = () => {
+    const projectName = document.getElementById('project-modal-name').value.trim();
+    const projectMode = document.querySelector('input[name="project-mode"]:checked').value;
+    const modalStatus = document.getElementById('project-modal-status');
+    modalStatus.textContent = '';
+
+    if (!projectName) {
+        modalStatus.textContent = 'Project Name is required.';
+        return;
+    }
+
+    if (projectMode === 'new') {
+        showToast(`New Project created: "${projectName}". Redirection simulation.`, 'info');
+        closeProjectModal();
+        return;
+    }
+
+    const startDateStr = document.getElementById('project-modal-start-date').value;
+    const endDateStr = document.getElementById('project-modal-end-date').value;
+    const projectDescription = document.getElementById('project-modal-description').value.trim();
+
+    if (!startDateStr || !endDateStr) {
+        modalStatus.textContent = 'Start Date and End Date are required in Current mode.';
+        return;
+    }
+
+    const taskStart = new Date(startDateStr + 'T00:00:00');
+    const taskEnd = new Date(endDateStr + 'T00:00:00');
+
+    if (taskStart >= taskEnd) {
+        modalStatus.textContent = 'Project End Date must be after the Start Date.';
+        return;
+    }
+
+    currentProject = {
+        name: projectName,
+        startDate: startDateStr,
+        endDate: endDateStr,
+        description: projectDescription
+    };
+
+    saveProjectToStorage();
+    closeProjectModal();
+    renderProjectInfo();
+    renderTimeline(currentProject.startDate, currentProject.endDate);
+    showToast(`Project boundaries successfully updated.`, 'info');
+};
+
+// --- Task modal (add/edit) ---
+const openTaskModal = (taskId = null) => {
+    const modal = document.getElementById('task-modal');
+    const saveButton = document.getElementById('save-task-ok');
+    const modalTitle = document.querySelector('#task-modal h2');
+
+    // Reset fields
+    document.getElementById('task-name').value = '';
+    document.getElementById('task-start-date').value = '';
+    document.getElementById('task-end-date').value = '';
+    document.getElementById('task-description').value = '';
+    document.getElementById('task-completed').checked = false;
+    document.getElementById('task-modal-status').textContent = '';
+
+    // Default to Add mode
+    saveButton.removeAttribute('data-task-id');
+    saveButton.textContent = 'Add Task';
+    modalTitle.textContent = 'Add New Task';
+
+    if (taskId !== null) {
+        const taskToEdit = tasks.find(t => Number(t.id) === Number(taskId));
+        if (taskToEdit) {
+            document.getElementById('task-name').value = taskToEdit.name;
+            document.getElementById('task-start-date').value = taskToEdit.startDate;
+            document.getElementById('task-end-date').value = taskToEdit.endDate;
+            document.getElementById('task-description').value = taskToEdit.description;
+            document.getElementById('task-completed').checked = !!taskToEdit.completed;
+
+            saveButton.setAttribute('data-task-id', taskId);
+            saveButton.textContent = 'Save Changes';
+            modalTitle.textContent = 'Edit Task';
+        }
+    }
+
+    modal.classList.remove('hidden');
+};
+
+const closeTaskModal = () => {
+    document.getElementById('task-modal').classList.add('hidden');
+};
+
+const saveTask = () => {
+    const taskName = document.getElementById('task-name').value.trim();
+    const taskStartDateStr = document.getElementById('task-start-date').value;
+    const taskEndDateStr = document.getElementById('task-end-date').value;
+    const taskDescription = document.getElementById('task-description').value.trim();
+    const taskCompleted = document.getElementById('task-completed').checked;
+    const modalStatus = document.getElementById('task-modal-status');
+    const saveButton = document.getElementById('save-task-ok');
+    const editingTaskId = saveButton.getAttribute('data-task-id');
+
+    modalStatus.textContent = '';
+
+    if (!taskName || !taskStartDateStr || !taskEndDateStr) {
+        modalStatus.textContent = 'Please fill in the Task Name, Start Date, and End Date.';
+        return;
+    }
+
+    const taskStart = new Date(taskStartDateStr + 'T00:00:00');
+    const taskEnd = new Date(taskEndDateStr + 'T00:00:00');
+
+    if (isNaN(taskStart.getTime()) || isNaN(taskEnd.getTime())) {
+        modalStatus.textContent = 'Invalid date format.';
+        return;
+    }
+
+    if (taskStart >= taskEnd) {
+        modalStatus.textContent = 'Task End Date must be after the Start Date.';
+        return;
+    }
+
+    let message = '';
+
+    if (editingTaskId) {
+        // Update existing task
+        const taskIdNumber = parseInt(editingTaskId);
+        let taskToUpdate = tasks.find(t => Number(t.id) === taskIdNumber);
+        if (taskToUpdate) {
+            taskToUpdate.name = taskName;
+            taskToUpdate.startDate = taskStartDateStr;
+            taskToUpdate.endDate = taskEndDateStr;
+            taskToUpdate.description = taskDescription;
+            taskToUpdate.completed = taskCompleted;
+            message = `Task "${taskName}" updated successfully.`;
+            saveTasksToStorage();
+            // SEND TO SERVER (optional)
+            sendTaskUpdate(taskToUpdate);
+        }
+    } else {
+        // Add new task
+        const newTaskId = Date.now();
+        const newTask = {
+            id: newTaskId,
+            name: taskName,
+            startDate: taskStartDateStr,
+            endDate: taskEndDateStr,
+            description: taskDescription,
+            completed: taskCompleted
+        };
+        tasks.push(newTask);
+        message = `New task "${taskName}" added successfully.`;
+        saveTasksToStorage();
+        // SEND TO SERVER (optional)
+        sendTaskUpdate(newTask);
+    }
+
+    closeTaskModal();
+    showToast(message, 'success');
+    checkAndUpdateTimeline();
+};
+
+// --- Context menu logic (Clone persists to storage) ---
+const showContextMenu = (e, taskId) => {
+    e.preventDefault();
+    const menu = document.getElementById('context-menu');
+    menu.classList.add('hidden');
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const menuWidth = 160;
+    const menuHeight = 280;
+    let left = e.clientX;
+    let top = e.clientY;
+
+    if (left + menuWidth > viewportWidth) {
+        left = viewportWidth - menuWidth - 10;
+    }
+    if (top + menuHeight > viewportHeight) {
+        top = viewportHeight - menuHeight - 10;
+    }
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+
+    menu.setAttribute('data-task-id', taskId);
+    menu.classList.remove('hidden');
+};
+
+const handleContextMenuAction = (action) => {
+    const menu = document.getElementById('context-menu');
+    const taskId = parseInt(menu.getAttribute('data-task-id'));
+    menu.classList.add('hidden');
+    if (!taskId) return;
+
+    if (action === 'Edit') {
+        openTaskModal(taskId);
+    } else if (action === 'Clone') {
+        const originalTask = tasks.find(t => Number(t.id) === Number(taskId));
+        if (originalTask) {
+            const newTask = {
+                id: Date.now(),
+                name: `Clone of ${originalTask.name}`,
+                startDate: originalTask.startDate,
+                endDate: originalTask.endDate,
+                description: originalTask.description,
+                completed: false
+            };
+            tasks.push(newTask);
+            saveTasksToStorage();
+            // notify server (optional)
+            sendTaskUpdate(newTask);
+            showToast(`Task "${originalTask.name}" cloned successfully.`, 'success');
+            checkAndUpdateTimeline();
+        }
+    } else {
+        showToast(`"${action}" feature is still in development.`, 'info');
+    }
+};
+
+const renderProjectInfo = () => {
+    document.getElementById('project-name-display').textContent = currentProject.name;
+    document.getElementById('project-description-display').textContent = currentProject.description || 'No description provided.';
+};
+
+// --- Tasks rendering (unchanged logic, but uses persisted 'tasks') ---
+const renderTasks = () => {
+    const taskBarsContainer = document.getElementById('task-bars-container');
+    const timelineContainer = document.getElementById('timeline-container');
+    taskBarsContainer.innerHTML = '';
+
+    if (!timelineStartDate || timelineTotalDays <= 0) return;
+
+    const BAR_HEIGHT_PX = 32;
+    const BAR_MARGIN_PX = 8;
+    const STACK_HEIGHT = BAR_HEIGHT_PX + BAR_MARGIN_PX;
+    const BASE_TOP_OFFSET_PX = 64;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    tasks.forEach((task, index) => {
+        const taskStart = new Date(task.startDate + 'T00:00:00');
+        const taskEnd = new Date(task.endDate + 'T00:00:00');
+
+        const startDayOffset = getDayDifference(timelineStartDate, taskStart);
+        const endDayOffset = getDayDifference(timelineStartDate, taskEnd);
+
+        const actualStartDay = Math.max(0, startDayOffset);
+        const actualEndDay = Math.min(timelineTotalDays, endDayOffset);
+
+        const visibleTaskDuration = actualEndDay - actualStartDay;
+
+        const leftPercent = (actualStartDay / timelineTotalDays) * 100;
+        const widthPercent = (visibleTaskDuration / timelineTotalDays) * 100;
+
+        if (widthPercent > 0) {
+            const taskBar = document.createElement('div');
+
+            let bgColor, borderColor, labelSuffix, hoverColor = '';
+
+            if (task.completed) {
+                bgColor = 'bg-secondary-green/70';
+                borderColor = 'border-primary-green';
+                hoverColor = 'hover:bg-primary-green';
+                labelSuffix = ' (Done)';
+            } else if (taskEnd < today) {
+                bgColor = 'bg-red-600/70';
+                borderColor = 'border-red-800';
+                hoverColor = 'hover:bg-red-800';
+                labelSuffix = ' (OVERDUE)';
+            } else {
+                bgColor = 'bg-indigo-500/70';
+                borderColor = 'border-indigo-700';
+                hoverColor = 'hover:bg-indigo-700';
+            }
+
+            taskBar.className = `absolute h-8 rounded-md shadow-lg transition-all duration-300 ${bgColor} ${hoverColor} ${borderColor} border cursor-pointer`;
+            taskBar.setAttribute('onclick', `openTaskModal(${task.id})`);
+            taskBar.setAttribute('oncontextmenu', `showContextMenu(event, ${task.id})`);
+
+            taskBar.style.left = `${leftPercent.toFixed(2)}%`;
+            taskBar.style.width = `${widthPercent.toFixed(2)}%`;
+            taskBar.style.top = `${index * STACK_HEIGHT}px`;
+
+            const startMonth = taskStart.toLocaleString('en-US', { month: 'short' });
+            const startDay = taskStart.getDate();
+            const endMonth = taskEnd.toLocaleString('en-US', { month: 'short' });
+            const endDay = taskEnd.getDate();
+
+            taskBar.innerHTML = `
+                            <div class="h-full flex items-center px-4 overflow-hidden">
+                                <span class="text-white text-xs font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                                    ${task.name}
+                                    ${labelSuffix || ''}
+                                </span>
+                            </div>
+                            <div class="absolute top-0 -left-10 flex flex-col items-center w-12">
+                                <span class="text-xs font-bold text-gray-700">${startMonth}</span>
+                                <span class="text-xs text-gray-700">${startDay}</span>
+                            </div>
+                            <div class="absolute top-0 -right-10 flex flex-col items-center w-12">
+                                <span class="text-xs font-bold text-gray-700">${endMonth}</span>
+                                <span class="text-xs text-gray-700">${endDay}</span>
+                            </div>
+                        `;
+
+            taskBarsContainer.appendChild(taskBar);
+        }
+    });
+
+    if (tasks.length > 0) {
+        const requiredHeight = BASE_TOP_OFFSET_PX + (tasks.length * STACK_HEIGHT) + 40;
+        timelineContainer.style.minHeight = `${requiredHeight}px`;
+    } else {
+        timelineContainer.style.minHeight = '60vh';
+    }
+};
+
+// --- Main timeline render (unchanged) ---
+const renderTimeline = (startDateStr, endDateStr) => {
+    const tickContainer = document.getElementById('daily-ticks-container');
+    const monthLabelsContainer = document.getElementById('month-labels-container');
+    const progressFill = document.getElementById('progress-fill');
+    const todayMarker = document.getElementById('today-marker');
+    const todayLabel = document.getElementById('today-label');
+    const startMarkerLabel = document.getElementById('start-marker-label');
+    const endMarkerLabel = document.getElementById('end-marker-label');
+
+    tickContainer.innerHTML = '';
+    monthLabelsContainer.innerHTML = '';
+    progressFill.style.width = '0%';
+    todayMarker.style.left = '0%';
+    todayMarker.classList.add('hidden');
+
+    const startDate = new Date(startDateStr + 'T00:00:00');
+    const endDate = new Date(endDateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const totalDays = getDayDifference(startDate, endDate);
+
+    if (totalDays <= 0 || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        showToast('Invalid date range. Ensure the Start Date is before the End Date.', 'error');
+        timelineStartDate = null;
+        timelineEndDate = null;
+        timelineTotalDays = 0;
+        renderTasks();
+        return;
+    }
+
+    timelineStartDate = startDate;
+    timelineEndDate = endDate;
+    timelineTotalDays = totalDays;
+
+    const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+
+    startMarkerLabel.innerHTML = `<p class="text-xs font-semibold text-primary-green mt-1">${formatter.format(startDate)}</p>`;
+    endMarkerLabel.innerHTML = `<p class="text-xs font-semibold text-gray-900 mt-1">${formatter.format(endDate)}</p>`;
+
+    const monthBoundaries = {};
+
+    for (let i = 0; i <= totalDays; i++) {
+        const currentDay = new Date(startDate);
+        currentDay.setDate(startDate.getDate() + i);
+
+        const monthKey = `${currentDay.getFullYear()}-${String(currentDay.getMonth() + 1).padStart(2, '0')}`;
+        const monthName = monthFormatter.format(currentDay);
+
+        const positionPercent = (i / totalDays) * 100;
+
+        if (!monthBoundaries[monthKey]) {
+            monthBoundaries[monthKey] = {
+                name: monthName,
+                startDayIndex: i,
+                endDayIndex: i
+            };
+        }
+
+        monthBoundaries[monthKey].endDayIndex = i;
+
+        if (i > 0 && i < totalDays) {
+            const calendarDay = currentDay.getDate();
+            const position = positionPercent;
+
+            let className = 'daily-tick';
+            let labelHTML = '';
+
+            if (i % 5 === 0) {
+                className = 'labeled-tick';
+                labelHTML = `<div class="absolute -top-4 left-1/2 transform -translate-x-1/2 w-10 text-center text-xs font-bold text-gray-700 z-20">${calendarDay}</div>`;
+            }
+
+            const tickMarker = document.createElement('div');
+            tickMarker.className = `vertical-tick-marker`;
+            tickMarker.style.left = `${position}%`;
+            tickMarker.innerHTML = labelHTML + `<div class="${className}"></div>`;
+
+            tickContainer.appendChild(tickMarker);
+        }
+    }
+
+    const monthKeys = Object.keys(monthBoundaries).sort();
+
+    for (let i = 0; i < monthKeys.length; i++) {
+        const currentMonthKey = monthKeys[i];
+        const currentMonth = monthBoundaries[currentMonthKey];
+
+        let monthStartDayIndex;
+
+        if (i === 0) {
+            monthStartDayIndex = 0;
+        } else {
+            const previousMonthKey = monthKeys[i - 1];
+            monthStartDayIndex = monthBoundaries[previousMonthKey].endDayIndex;
+        }
+
+        const monthEndDayIndex = currentMonth.endDayIndex;
+
+        const leftPercent = (monthStartDayIndex / totalDays) * 100;
+        const rightPercent = (monthEndDayIndex / totalDays) * 100;
+
+        const widthPercent = rightPercent - leftPercent;
+
+        if (widthPercent <= 0) continue;
+
+        const monthLabel = document.createElement('div');
+        monthLabel.className = 'absolute bg-gray-200 h-4 flex items-center justify-center text-xs font-bold text-gray-900 px-2 border border-gray-500 z-30';
+
+        monthLabel.style.left = `${leftPercent.toFixed(2)}%`;
+        monthLabel.style.width = `${widthPercent.toFixed(2)}%`;
+
+        monthLabel.textContent = currentMonth.name;
+
+        monthLabelsContainer.appendChild(monthLabel);
+    }
+
+    const todayDayNumber = getDayDifference(startDate, today);
+
+    if (todayDayNumber >= 0 && todayDayNumber <= totalDays) {
+        const progressPercent = (todayDayNumber / totalDays) * 100;
+        progressFill.style.width = `${progressPercent.toFixed(2)}%`;
+        todayMarker.style.left = `${progressPercent.toFixed(2)}%`;
+        todayMarker.classList.remove('hidden');
+        todayLabel.textContent = `Today: ${formatter.format(today)}`;
+    } else if (todayDayNumber < 0) {
+        progressFill.style.width = '0%';
+        todayMarker.style.left = '0%';
+        todayMarker.classList.remove('hidden');
+        todayLabel.textContent = `Before Start (${formatter.format(today)})`;
+    } else {
+        progressFill.style.width = '100%';
+        todayMarker.style.left = '100%';
+        todayMarker.classList.remove('hidden');
+        todayLabel.textContent = `After End (${formatter.format(today)})`;
+    }
+
+    renderTasks();
+};
+
+// --- Event listeners & initial bootstrapping ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load persisted state
+    loadProjectFromStorage();
+    loadTasksFromStorage();
+
+    // Optional remote sync on load (if you enable REMOTE_SYNC_ON_LOAD)
+    await tryFetchRemoteTasksOnLoad();
+
+    renderProjectInfo();
+    renderTimeline(currentProject.startDate, currentProject.endDate);
+
+    // Task Modal listeners
+    document.getElementById('open-task-modal').addEventListener('click', () => openTaskModal(null));
+    document.getElementById('cancel-task').addEventListener('click', closeTaskModal);
+    document.getElementById('save-task-ok').addEventListener('click', saveTask);
+
+    // Project Modal listeners
+    document.getElementById('open-project-modal').addEventListener('click', openProjectModal);
+    document.getElementById('project-modal-cancel').addEventListener('click', closeProjectModal);
+    document.getElementById('project-modal-ok').addEventListener('click', handleProjectModalOk);
+
+    document.getElementById('project-mode-current').addEventListener('change', (e) => updateProjectModalState(e.target.value));
+    document.getElementById('project-mode-new').addEventListener('change', (e) => updateProjectModalState(e.target.value));
+
+    // Hide context menu when clicking anywhere else
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('context-menu');
+        if (menu && !menu.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+
+    // Hide context menu on scroll
+    window.addEventListener('scroll', () => {
+        document.getElementById('context-menu').classList.add('hidden');
+    });
+});
