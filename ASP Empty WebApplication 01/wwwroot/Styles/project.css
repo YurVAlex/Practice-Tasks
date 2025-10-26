@@ -54,3 +54,47 @@
 #delete-confirm-modal {
     pointer-events: auto;
 }
+
+/* Tooltip for task descriptions */
+#task-tooltip {
+    position: fixed;
+    z-index: 100000; /* above everything */
+    max-width: 320px;
+    background: rgba(17,24,39,0.95); /* dark bg */
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    font-size: 13px;
+    line-height: 1.25;
+    pointer-events: none; /* allow mouse events to pass through */
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    opacity: 0;
+    transform: translateY(6px);
+    word-break: break-word;
+}
+
+    /* Visible state */
+    #task-tooltip.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* Small caret using pseudo element */
+    #task-tooltip::after {
+        content: '';
+        position: absolute;
+        bottom: -6px;
+        left: 12px;
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 6px solid rgba(17,24,39,0.95);
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    }
+
+    /* Ensure tooltip text doesn't select */
+    #task-tooltip, #task-tooltip * {
+        user-select: none;
+    }

@@ -1,14 +1,4 @@
-﻿/**
- * scripts/project.js
- * Updated to:
- * - Ensure overdue tasks use overdue-red styling even if progress is 99%
- * - Automatically convert progress === 100 to completed=true (and clear progress)
- * - Normalize task status on load/save/clone to keep consistent state
- *
- * (This is the full script; replace your existing scripts/project.js with this file.)
- */
-
-tailwind.config = {
+﻿tailwind.config = {
     theme: {
         extend: {
             colors: {
@@ -67,6 +57,9 @@ let pendingDeletionTaskId = null; // for delete-confirm modal
 let _deleteModalKeyHandler = null;
 let _deleteModalOverlayHandler = null;
 let contextMenuTaskId = null; // robust context-menu selection
+
+// Tooltip element reference
+let tooltipEl = null;
 
 // --- Helper: normalize task status ---
 // Ensures:
@@ -456,6 +449,69 @@ const handleProjectModalOk = () => {
     showToast(`Project boundaries successfully updated.`, 'info');
 };
 
+// --- QUICK SCALE modal helpers (new) ---
+// Opens the compact modal used when clicking the progress line.
+// Only allows editing start/end dates and OK/Cancel.
+const openScaleModal = () => {
+    const modal = document.getElementById('scale-modal');
+    if (!modal) return;
+
+    // Populate fields from currentProject
+    document.getElementById('scale-modal-start-date').value = currentProject.startDate || '';
+    document.getElementById('scale-modal-end-date').value = currentProject.endDate || '';
+    document.getElementById('scale-modal-status').textContent = '';
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+
+    // focus start date for accessibility
+    setTimeout(() => {
+        const startInput = document.getElementById('scale-modal-start-date');
+        if (startInput) startInput.focus();
+    }, 0);
+};
+
+const closeScaleModal = () => {
+    const modal = document.getElementById('scale-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+};
+
+const handleScaleModalOk = () => {
+    const status = document.getElementById('scale-modal-status');
+    status.textContent = '';
+
+    const startDateStr = document.getElementById('scale-modal-start-date').value;
+    const endDateStr = document.getElementById('scale-modal-end-date').value;
+
+    if (!startDateStr || !endDateStr) {
+        status.textContent = 'Start Date and End Date are required.';
+        return;
+    }
+    const s = new Date(startDateStr + 'T00:00:00');
+    const e = new Date(endDateStr + 'T00:00:00');
+
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+        status.textContent = 'Invalid date format.';
+        return;
+    }
+    if (s >= e) {
+        status.textContent = 'End date must be after start date.';
+        return;
+    }
+
+    // Update project bounds, persist, and re-render timeline
+    currentProject.startDate = startDateStr;
+    currentProject.endDate = endDateStr;
+    saveProjectToStorage();
+    renderProjectInfo();
+    renderTimeline(currentProject.startDate, currentProject.endDate);
+
+    showToast('Timeline updated.', 'success');
+    closeScaleModal();
+};
+
 // --- Task modal (add/edit) ---
 const openTaskModal = (taskId = null) => {
     const modal = document.getElementById('task-modal');
@@ -696,6 +752,9 @@ const showContextMenu = (e, taskId) => {
     menu.setAttribute('data-task-id', taskId);
     contextMenuTaskId = Number(taskId);
 
+    // Also hide tooltip when context menu opens
+    hideTooltip();
+
     menu.classList.remove('hidden');
 };
 
@@ -747,25 +806,29 @@ const closeDeleteConfirmModal = () => {
     const modal = document.getElementById('delete-confirm-modal');
     if (!modal) return;
 
+    // hide modal and restore scroll immediately
     modal.classList.add('hidden');
-    pendingDeletionTaskId = null;
-
-    // restore scrolling
     document.body.classList.remove('modal-open');
 
-    // remove handlers
+    // remove key handler if attached
     if (_deleteModalKeyHandler) {
         document.removeEventListener('keydown', _deleteModalKeyHandler);
         _deleteModalKeyHandler = null;
     }
+
+    // remove overlay click handler if attached (fixed variable name)
     if (_deleteModalOverlayHandler) {
         modal.removeEventListener('click', _deleteModalOverlayHandler);
         _deleteModalOverlayHandler = null;
     }
+
+    // clear pending deletion id
+    pendingDeletionTaskId = null;
 };
 
 const handleConfirmDelete = () => {
-    if (!pendingDeletionTaskId) {
+    // explicit null check so an id of 0 (if it ever occurred) wouldn't be treated as "no task"
+    if (pendingDeletionTaskId === null) {
         closeDeleteConfirmModal();
         showToast('No task selected for deletion.', 'error');
         return;
@@ -789,7 +852,8 @@ const handleConfirmDelete = () => {
 
     closeDeleteConfirmModal();
 
-    // Recalculate timeline/project bounds and re-render (fit exact)
+    // Recalculate timeline/project bounds and re-render (fit exact).
+    // fitTimelineToTasks(true) will call renderTimeline which calls renderTasks().
     adjustTimelineAfterDeletion();
 };
 
@@ -828,10 +892,7 @@ const handleContextMenuAction = (action) => {
             // clone must normalize: if original had progress 100 -> completed true
             const clone = Object.assign({}, originalTask);
             clone.id = Date.now();
-            // ensure new cloned task is not marked completed if original wasn't; but preserve progress value (unless 100)
             normalizeTask(clone);
-            // for clones we usually want completed=false so user can adjust; but follow user's choice: preserve state, except ensure unique id
-            // If you prefer clones always be incomplete, set clone.completed = false; clone.progress = clone.progress === null ? 0 : clone.progress;
             tasks.push(clone);
             saveTasksToStorage();
             // notify server (optional)
@@ -855,11 +916,67 @@ const renderProjectInfo = () => {
     document.getElementById('project-description-display').textContent = currentProject.description || 'No description provided.';
 };
 
-// --- Tasks rendering (updated ordering so overdue takes precedence over progress) ---
+// Tooltip utilities
+function ensureTooltip() {
+    if (!tooltipEl) {
+        tooltipEl = document.getElementById('task-tooltip');
+    }
+}
+
+function showTooltipAt(x, y, htmlContent) {
+    ensureTooltip();
+    if (!tooltipEl) return;
+    tooltipEl.innerHTML = htmlContent || '';
+    tooltipEl.classList.add('show');
+    tooltipEl.classList.remove('hidden');
+    tooltipEl.setAttribute('aria-hidden', 'false');
+
+    // Positioning: prefer above the cursor, but keep within viewport
+    const padding = 12;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Temporarily make visible to measure
+    tooltipEl.style.left = '0px';
+    tooltipEl.style.top = '0px';
+    tooltipEl.style.maxWidth = '320px';
+
+    const rect = tooltipEl.getBoundingClientRect();
+    let left = x + 12; // slightly right of cursor
+    let top = y - rect.height - 12; // above cursor
+
+    // If it would go off right edge, shift left
+    if (left + rect.width + padding > vw) {
+        left = Math.max(padding, vw - rect.width - padding);
+    }
+    // If it would go above top, show below cursor instead
+    if (top < padding) {
+        top = y + 16; // below cursor
+        // adjust caret position via CSS -- not necessary for this simple implementation
+    }
+    tooltipEl.style.left = `${left}px`;
+    tooltipEl.style.top = `${top}px`;
+}
+
+function hideTooltip() {
+    ensureTooltip();
+    if (!tooltipEl) return;
+    tooltipEl.classList.remove('show');
+    // allow transition then hide
+    setTimeout(() => {
+        if (tooltipEl) {
+            tooltipEl.classList.add('hidden');
+            tooltipEl.setAttribute('aria-hidden', 'true');
+        }
+    }, 120);
+}
+
+// --- Tasks rendering (updated to attach hover tooltip) ---
 const renderTasks = () => {
     const taskBarsContainer = document.getElementById('task-bars-container');
     const timelineContainer = document.getElementById('timeline-container');
     taskBarsContainer.innerHTML = '';
+
+    ensureTooltip(); // ensure tooltip exists
 
     if (!timelineStartDate || timelineTotalDays <= 0) return;
 
@@ -923,13 +1040,13 @@ const renderTasks = () => {
             }
 
             taskBar.className = `absolute h-8 rounded-md shadow-lg transition-all duration-300 ${bgColor} ${hoverColor} ${borderColor} border cursor-pointer`;
+            taskBar.setAttribute('data-task-id', String(task.id));
             taskBar.setAttribute('onclick', `openTaskModal(${task.id})`);
             taskBar.setAttribute('oncontextmenu', `showContextMenu(event, ${task.id})`);
 
             taskBar.style.left = `${leftPercent.toFixed(2)}%`;
-            taskBar.style.width = `${widthPercent.toFixed(2)}%`;
+            taskBar.style.width = `${widthPercent.toFixed(02)}%`;
             taskBar.style.top = `${index * STACK_HEIGHT}px`;
-            taskBar.style.overflow = 'hidden';
 
             const startMonth = taskStart.toLocaleString('en-US', { month: 'short' });
             const startDay = taskStart.getDate();
@@ -949,8 +1066,8 @@ const renderTasks = () => {
 
             taskBar.innerHTML = `
                             ${progressHTML}
-                            <div class="h-full flex items-center px-4 overflow-hidden relative z-10">
-                                <span class="text-white text-xs font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                            <div class="h-full flex items-center px-4 relative z-10">
+                                <span class="text-white text-xs font-semibold whitespace-nowrap text-ellipsis overflow-hidden">
                                     ${task.name}
                                     ${labelSuffix || ''}
                                 </span>
@@ -960,10 +1077,39 @@ const renderTasks = () => {
                                 <span class="text-xs text-gray-700">${startDay}</span>
                             </div>
                             <div class="absolute top-0 -right-10 flex flex-col items-center w-12 z-10">
-                                <span class="text-xs font-bold text-gray-700">${endMonth}</span>
+                                <span class="text-xs font-bold text-gray-700 ">${endMonth}</span>
                                 <span class="text-xs text-gray-700">${endDay}</span>
                             </div>
                         `;
+
+            // Attach hover handlers for tooltip
+            // mouseenter -> show tooltip
+            taskBar.addEventListener('mouseenter', (ev) => {
+                // If context menu or modal open, do not show
+                const ctx = document.getElementById('context-menu');
+                if (ctx && !ctx.classList.contains('hidden')) return;
+                const descr = task.description || 'No description provided.';
+                // Use simple HTML - escape content minimal by text node creation below
+                const safeHtml = escapeHtml(descr);
+                // Show tooltip near mouse pointer
+                showTooltipAt(ev.clientX, ev.clientY, safeHtml);
+            });
+
+            // mousemove -> reposition tooltip
+            taskBar.addEventListener('mousemove', (ev) => {
+                const ctx = document.getElementById('context-menu');
+                if (ctx && !ctx.classList.contains('hidden')) {
+                    hideTooltip();
+                    return;
+                }
+                // Update position
+                showTooltipAt(ev.clientX, ev.clientY, escapeHtml(task.description || 'No description provided.'));
+            });
+
+            // mouseleave -> hide tooltip
+            taskBar.addEventListener('mouseleave', () => {
+                hideTooltip();
+            });
 
             taskBarsContainer.appendChild(taskBar);
         }
@@ -977,7 +1123,19 @@ const renderTasks = () => {
     }
 };
 
-// --- Main timeline render (unchanged) ---
+// Utility to escape text into safe HTML (very simple)
+function escapeHtml(text) {
+    if (text === undefined || text === null) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>');
+}
+
+// --- Main timeline render (unchanged except month boundary shift) ---
 const renderTimeline = (startDateStr, endDateStr) => {
     const tickContainer = document.getElementById('daily-ticks-container');
     const monthLabelsContainer = document.getElementById('month-labels-container');
@@ -986,6 +1144,11 @@ const renderTimeline = (startDateStr, endDateStr) => {
     const todayLabel = document.getElementById('today-label');
     const startMarkerLabel = document.getElementById('start-marker-label');
     const endMarkerLabel = document.getElementById('end-marker-label');
+
+    progressFill.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        openScaleModal();
+    });
 
     tickContainer.innerHTML = '';
     monthLabelsContainer.innerHTML = '';
@@ -1067,16 +1230,19 @@ const renderTimeline = (startDateStr, endDateStr) => {
         const currentMonthKey = monthKeys[i];
         const currentMonth = monthBoundaries[currentMonthKey];
 
+        // Shift month boundaries one day to the right for visual alignment
         let monthStartDayIndex;
-
         if (i === 0) {
+            // keep first month start at 0 so we don't create an empty gap at timeline start
             monthStartDayIndex = 0;
         } else {
             const previousMonthKey = monthKeys[i - 1];
-            monthStartDayIndex = monthBoundaries[previousMonthKey].endDayIndex;
+            // start one day after the previous month's end
+            monthStartDayIndex = Math.min(totalDays, monthBoundaries[previousMonthKey].endDayIndex + 1);
         }
 
-        const monthEndDayIndex = currentMonth.endDayIndex;
+        // end boundary should also be one day to the right for correct visual placement
+        const monthEndDayIndex = Math.min(totalDays, currentMonth.endDayIndex + 1);
 
         const leftPercent = (monthStartDayIndex / totalDays) * 100;
         const rightPercent = (monthEndDayIndex / totalDays) * 100;
@@ -1101,7 +1267,7 @@ const renderTimeline = (startDateStr, endDateStr) => {
     if (todayDayNumber >= 0 && todayDayNumber <= totalDays) {
         const progressPercent = (todayDayNumber / totalDays) * 100;
         progressFill.style.width = `${progressPercent.toFixed(2)}%`;
-        todayMarker.style.left = `${progressPercent.toFixed(2)}%`;
+        todayMarker.style.left = `${progressPercent.toFixed(02)}%`;
         todayMarker.classList.remove('hidden');
         todayLabel.textContent = `Today: ${formatter.format(today)}`;
     } else if (todayDayNumber < 0) {
@@ -1160,6 +1326,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('project-mode-current').addEventListener('change', (e) => updateProjectModalState(e.target.value));
     document.getElementById('project-mode-new').addEventListener('change', (e) => updateProjectModalState(e.target.value));
 
+    // QUICK SCALE modal listeners (progress-line click / small modal)
+    const progressLine = document.getElementById('progress-line');
+    if (progressLine) {
+        // open quick-scale modal when user clicks the progress line
+        progressLine.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            openScaleModal();
+        });
+    }
+    const scaleCancel = document.getElementById('scale-modal-cancel');
+    const scaleOk = document.getElementById('scale-modal-ok');
+    if (scaleCancel) scaleCancel.addEventListener('click', closeScaleModal);
+    if (scaleOk) scaleOk.addEventListener('click', handleScaleModalOk);
+
     // Delete-confirm modal listeners
     const deleteCancel = document.getElementById('delete-confirm-cancel');
     const deleteOk = document.getElementById('delete-confirm-ok');
@@ -1198,7 +1378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Hide context menu on scroll
+    // Hide context menu on scroll and hide tooltip on scroll
     window.addEventListener('scroll', () => {
         const menu = document.getElementById('context-menu');
         if (menu) {
@@ -1206,5 +1386,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             contextMenuTaskId = null;
             menu.removeAttribute('data-task-id');
         }
+        hideTooltip();
     });
+
+    // Hide tooltip when resizing
+    window.addEventListener('resize', hideTooltip);
 });
