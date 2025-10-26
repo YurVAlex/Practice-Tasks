@@ -44,3 +44,13 @@
     z-index: 9999;
     pointer-events: none;
 }
+
+/* When a modal is open we avoid page scrolling */
+.modal-open {
+    overflow: hidden;
+}
+
+/* Ensure the delete modal content receives pointer events even if Tailwind config differs */
+#delete-confirm-modal {
+    pointer-events: auto;
+}

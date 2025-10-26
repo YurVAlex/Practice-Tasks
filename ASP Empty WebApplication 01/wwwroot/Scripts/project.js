@@ -1,4 +1,14 @@
-﻿tailwind.config = {
+﻿/**
+ * scripts/project.js
+ * Updated to:
+ * - Ensure overdue tasks use overdue-red styling even if progress is 99%
+ * - Automatically convert progress === 100 to completed=true (and clear progress)
+ * - Normalize task status on load/save/clone to keep consistent state
+ *
+ * (This is the full script; replace your existing scripts/project.js with this file.)
+ */
+
+tailwind.config = {
     theme: {
         extend: {
             colors: {
@@ -28,6 +38,7 @@ const defaultProject = {
     description: "This is the default, initial project description."
 };
 
+// Note: tasks include optional `progress` (number 0-100) and `completed` (boolean).
 const defaultTasks = [
     {
         id: 1,
@@ -35,7 +46,8 @@ const defaultTasks = [
         startDate: "2025-10-18",
         endDate: "2025-11-05",
         description: "Drafting the initial concept and wireframes.",
-        completed: true
+        completed: true,
+        progress: null
     },
     {
         id: 2,
@@ -43,13 +55,57 @@ const defaultTasks = [
         startDate: "2025-10-07",
         endDate: "2025-10-20",
         description: "Core coding and API integration.",
-        completed: false
+        completed: false,
+        progress: 0
     }
 ];
 
 // In-memory references (will be initialized from localStorage on load)
 let tasks = [];
 let currentProject = {};
+let pendingDeletionTaskId = null; // for delete-confirm modal
+let _deleteModalKeyHandler = null;
+let _deleteModalOverlayHandler = null;
+let contextMenuTaskId = null; // robust context-menu selection
+
+// --- Helper: normalize task status ---
+// Ensures:
+// - completed is boolean
+// - progress is either null or a number 0..100
+// - if progress >= 100 => mark completed = true and progress = null
+function normalizeTask(task) {
+    if (!task || typeof task !== 'object') return;
+
+    // Ensure completed exists as boolean
+    task.completed = !!task.completed;
+
+    // Normalize progress presence
+    if (!('progress' in task) || task.progress === undefined || task.progress === null) {
+        // If completed -> no progress; otherwise default to 0
+        task.progress = task.completed ? null : 0;
+    } else {
+        // coerce to number when possible
+        const p = Number(task.progress);
+        if (!isNaN(p)) {
+            // clamp between 0 and 100
+            const clamped = Math.max(0, Math.min(100, Math.round(p)));
+            task.progress = clamped;
+        } else {
+            task.progress = task.completed ? null : 0;
+        }
+    }
+
+    // If progress indicates fully done, mark completed and clear progress
+    if (typeof task.progress === 'number' && task.progress >= 100) {
+        task.completed = true;
+        task.progress = null;
+    }
+
+    // If completed is true, clear progress to avoid conflicting states
+    if (task.completed) {
+        task.progress = null;
+    }
+}
 
 // --- Persistence helpers ---
 function loadTasksFromStorage() {
@@ -58,7 +114,15 @@ function loadTasksFromStorage() {
         try {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
-                tasks = parsed;
+                // Normalize tasks (backwards compatibility)
+                tasks = parsed.map(t => {
+                    // Shallow copy to avoid mutating stored object unexpectedly
+                    const copy = Object.assign({}, t);
+                    normalizeTask(copy);
+                    return copy;
+                });
+                // Ensure saved normalized values are persisted
+                saveTasksToStorage();
                 return;
             }
         } catch (e) {
@@ -66,12 +130,18 @@ function loadTasksFromStorage() {
         }
     }
     // fallback to defaults
-    tasks = defaultTasks.slice();
+    tasks = defaultTasks.map(t => {
+        const copy = Object.assign({}, t);
+        normalizeTask(copy);
+        return copy;
+    });
     saveTasksToStorage();
 }
 
 function saveTasksToStorage() {
     try {
+        // Normalize all tasks before saving to keep consistency
+        tasks.forEach(t => normalizeTask(t));
         localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
     } catch (e) {
         console.error('Failed to save tasks to localStorage', e);
@@ -128,7 +198,11 @@ async function tryFetchRemoteTasksOnLoad() {
         const remoteTasks = await res.json();
         if (Array.isArray(remoteTasks)) {
             // Very simple merge: prefer remote tasks (could be changed to two-way merge)
-            tasks = remoteTasks;
+            tasks = remoteTasks.map(t => {
+                const copy = Object.assign({}, t);
+                normalizeTask(copy);
+                return copy;
+            });
             saveTasksToStorage();
         }
     } catch (e) {
@@ -189,34 +263,110 @@ let timelineStartDate = new Date('2025-10-05T00:00:00');
 let timelineEndDate = new Date('2025-12-16T00:00:00');
 let timelineTotalDays = 0;
 
-const checkAndUpdateTimeline = () => {
-    let newTimelineStart = timelineStartDate;
-    let newTimelineEnd = timelineEndDate;
+/*
+  Centralized function: fitTimelineToTasks(shrinkAllowed)
+  - shrinkAllowed = true  => fit project bounds exactly to tasks (used by Scale and deletions)
+  - shrinkAllowed = false => expand project bounds only if tasks fall outside (used after add/clone/edit)
+  Important fix: always re-render task bars (renderTasks()) after tasks change, even if project bounds don't change.
+*/
+const fitTimelineToTasks = (shrinkAllowed = true) => {
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+        // no tasks -> revert to defaults
+        currentProject = Object.assign({}, defaultProject);
+        saveProjectToStorage();
+        renderProjectInfo();
+        renderTimeline(currentProject.startDate, currentProject.endDate);
+        showToast('No tasks present — timeline reset to default project bounds.', 'info');
+        return;
+    }
 
-    tasks.forEach(task => {
-        const taskStart = new Date(task.startDate + 'T00:00:00');
-        const taskEnd = new Date(task.endDate + 'T00:00:00');
+    let minStart = null;
+    let maxEnd = null;
 
-        if (taskStart < newTimelineStart) {
-            newTimelineStart = taskStart;
-        }
-        if (taskEnd > newTimelineEnd) {
-            newTimelineEnd = taskEnd;
-        }
+    tasks.forEach(t => {
+        const s = new Date(t.startDate + 'T00:00:00');
+        const e = new Date(t.endDate + 'T00:00:00');
+        if (isNaN(s.getTime()) || isNaN(e.getTime())) return;
+        if (minStart === null || s < minStart) minStart = s;
+        if (maxEnd === null || e > maxEnd) maxEnd = e;
     });
 
-    const newStartString = dateToISOString(newTimelineStart);
-    const newEndString = dateToISOString(newTimelineEnd);
-
-    if (newTimelineStart.getTime() !== timelineStartDate.getTime() || newTimelineEnd.getTime() !== timelineEndDate.getTime()) {
-        currentProject.startDate = newStartString;
-        currentProject.endDate = newEndString;
+    if (!minStart || !maxEnd) {
+        // fallback
+        currentProject = Object.assign({}, defaultProject);
         saveProjectToStorage();
-        showToast(`Timeline expanded to fit new task! (${newStartString} to ${newEndString})`, 'success');
-        renderTimeline(newStartString, newEndString);
-    } else {
-        renderTasks();
+        renderProjectInfo();
+        renderTimeline(currentProject.startDate, currentProject.endDate);
+        showToast('Unable to calculate task bounds — timeline reset to defaults.', 'error');
+        return;
     }
+
+    const newStartStr = dateToISOString(minStart);
+    const newEndStr = dateToISOString(maxEnd);
+
+    const currentStartStr = currentProject.startDate;
+    const currentEndStr = currentProject.endDate;
+
+    if (shrinkAllowed) {
+        // set to exact min/max
+        if (newStartStr !== currentStartStr || newEndStr !== currentEndStr) {
+            currentProject.startDate = newStartStr;
+            currentProject.endDate = newEndStr;
+            saveProjectToStorage();
+            renderProjectInfo();
+            renderTimeline(currentProject.startDate, currentProject.endDate);
+            // renderTimeline calls renderTasks internally
+            showToast(`Timeline adjusted to fit tasks (${newStartStr} to ${newEndStr}).`, 'info');
+            return;
+        } else {
+            // No project bounds change; still need to redraw task bars (e.g., after clone/add/delete)
+            renderTasks();
+            showToast('Timeline already fits all tasks.', 'info');
+            return;
+        }
+    } else {
+        // expand-only behavior: only modify start if earlier, end if later
+        let changed = false;
+        const curStartDate = new Date(currentStartStr + 'T00:00:00');
+        const curEndDate = new Date(currentEndStr + 'T00:00:00');
+
+        let updatedStart = currentStartStr;
+        let updatedEnd = currentEndStr;
+
+        if (minStart < curStartDate) {
+            updatedStart = newStartStr;
+            changed = true;
+        }
+        if (maxEnd > curEndDate) {
+            updatedEnd = newEndStr;
+            changed = true;
+        }
+
+        if (changed) {
+            currentProject.startDate = updatedStart;
+            currentProject.endDate = updatedEnd;
+            saveProjectToStorage();
+            renderProjectInfo();
+            renderTimeline(currentProject.startDate, currentProject.endDate);
+            showToast(`Timeline expanded to include task bounds (${updatedStart} to ${updatedEnd}).`, 'success');
+            return;
+        } else {
+            // No bounds change but tasks array may have changed -> re-render task bars so new/edited/cloned tasks show up
+            renderTasks();
+            showToast('No expansion needed — timeline already includes all tasks.', 'info');
+            return;
+        }
+    }
+};
+
+const checkAndUpdateTimeline = () => {
+    // Expand-only behavior when tasks are added/edited/cloned
+    fitTimelineToTasks(false); // expand only (do not shrink)
+};
+
+// --- adjustTimelineAfterDeletion now uses the same common function to fit exactly ---
+const adjustTimelineAfterDeletion = () => {
+    fitTimelineToTasks(true); // shrink allowed: fit exactly
 };
 
 // --- Project modal behavior (saving project persists to storage) ---
@@ -317,8 +467,19 @@ const openTaskModal = (taskId = null) => {
     document.getElementById('task-start-date').value = '';
     document.getElementById('task-end-date').value = '';
     document.getElementById('task-description').value = '';
-    document.getElementById('task-completed').checked = false;
     document.getElementById('task-modal-status').textContent = '';
+
+    // Reset new status radios and progress
+    const completedRadio = document.getElementById('task-status-completed');
+    const progressRadio = document.getElementById('task-status-progress');
+    const progressInput = document.getElementById('task-progress');
+
+    if (completedRadio) completedRadio.checked = false;
+    if (progressRadio) progressRadio.checked = false;
+    if (progressInput) {
+        progressInput.value = 0;
+        progressInput.disabled = true;
+    }
 
     // Default to Add mode
     saveButton.removeAttribute('data-task-id');
@@ -332,13 +493,70 @@ const openTaskModal = (taskId = null) => {
             document.getElementById('task-start-date').value = taskToEdit.startDate;
             document.getElementById('task-end-date').value = taskToEdit.endDate;
             document.getElementById('task-description').value = taskToEdit.description;
-            document.getElementById('task-completed').checked = !!taskToEdit.completed;
+
+            // Normalize before populating (safety)
+            normalizeTask(taskToEdit);
+
+            // Populate status controls: if completed -> completed radio, else progress radio with value
+            if (taskToEdit.completed) {
+                if (completedRadio) completedRadio.checked = true;
+                if (progressInput) {
+                    progressInput.value = 0;
+                    progressInput.disabled = true;
+                }
+            } else {
+                if (progressRadio) progressRadio.checked = true;
+                if (progressInput) {
+                    progressInput.value = (typeof taskToEdit.progress === 'number') ? Math.min(100, Math.max(0, Math.round(taskToEdit.progress))) : 0;
+                    progressInput.disabled = false;
+                }
+            }
 
             saveButton.setAttribute('data-task-id', taskId);
             saveButton.textContent = 'Save Changes';
             modalTitle.textContent = 'Edit Task';
         }
+    } else {
+        // Default new tasks to progress=0 (not completed)
+        if (progressRadio) progressRadio.checked = true;
+        if (progressInput) {
+            progressInput.value = 0;
+            progressInput.disabled = false;
+        }
     }
+
+    // Wire up the status radios to enable/disable the progress input (re-attach handlers cleanly)
+    const updateProgressAvailability = () => {
+        const prog = document.getElementById('task-progress');
+        const pr = document.getElementById('task-status-progress');
+        if (prog) {
+            if (pr && pr.checked) {
+                prog.disabled = false;
+            } else {
+                prog.disabled = true;
+                prog.value = 0;
+            }
+        }
+    };
+
+    // Remove prior listeners by cloning nodes to avoid duplicate handlers if modal opened multiple times
+    const completedNode = document.getElementById('task-status-completed');
+    const progressNode = document.getElementById('task-status-progress');
+
+    if (completedNode) {
+        const newCompleted = completedNode.cloneNode(true);
+        completedNode.parentNode.replaceChild(newCompleted, completedNode);
+    }
+    if (progressNode) {
+        const newProgress = progressNode.cloneNode(true);
+        progressNode.parentNode.replaceChild(newProgress, progressNode);
+    }
+
+    // Attach listeners to freshly replaced nodes
+    const completedNodeFresh = document.getElementById('task-status-completed');
+    const progressNodeFresh = document.getElementById('task-status-progress');
+    if (completedNodeFresh) completedNodeFresh.addEventListener('change', updateProgressAvailability);
+    if (progressNodeFresh) progressNodeFresh.addEventListener('change', updateProgressAvailability);
 
     modal.classList.remove('hidden');
 };
@@ -352,7 +570,6 @@ const saveTask = () => {
     const taskStartDateStr = document.getElementById('task-start-date').value;
     const taskEndDateStr = document.getElementById('task-end-date').value;
     const taskDescription = document.getElementById('task-description').value.trim();
-    const taskCompleted = document.getElementById('task-completed').checked;
     const modalStatus = document.getElementById('task-modal-status');
     const saveButton = document.getElementById('save-task-ok');
     const editingTaskId = saveButton.getAttribute('data-task-id');
@@ -377,6 +594,33 @@ const saveTask = () => {
         return;
     }
 
+    // Read status radios and progress input
+    const status = document.querySelector('input[name="task-status"]:checked');
+    let completedVal = false;
+    let progressVal = null;
+
+    if (status && status.value === 'completed') {
+        completedVal = true;
+        progressVal = null;
+    } else if (status && status.value === 'progress') {
+        completedVal = false;
+        const raw = document.getElementById('task-progress').value;
+        let parsed = parseInt(raw);
+        if (isNaN(parsed)) parsed = 0;
+        parsed = Math.max(0, Math.min(100, parsed));
+        progressVal = parsed;
+    } else {
+        // Fallback: not completed, progress 0
+        completedVal = false;
+        progressVal = 0;
+    }
+
+    // Automatic rule: if progressVal === 100 => mark completed and clear progress
+    if (typeof progressVal === 'number' && progressVal >= 100) {
+        completedVal = true;
+        progressVal = null;
+    }
+
     let message = '';
 
     if (editingTaskId) {
@@ -388,7 +632,10 @@ const saveTask = () => {
             taskToUpdate.startDate = taskStartDateStr;
             taskToUpdate.endDate = taskEndDateStr;
             taskToUpdate.description = taskDescription;
-            taskToUpdate.completed = taskCompleted;
+            taskToUpdate.completed = completedVal;
+            taskToUpdate.progress = progressVal;
+            // normalize to enforce invariants (especially when progress reached 100)
+            normalizeTask(taskToUpdate);
             message = `Task "${taskName}" updated successfully.`;
             saveTasksToStorage();
             // SEND TO SERVER (optional)
@@ -403,8 +650,11 @@ const saveTask = () => {
             startDate: taskStartDateStr,
             endDate: taskEndDateStr,
             description: taskDescription,
-            completed: taskCompleted
+            completed: completedVal,
+            progress: progressVal
         };
+        // normalize right away (handles progress==100 => completed)
+        normalizeTask(newTask);
         tasks.push(newTask);
         message = `New task "${taskName}" added successfully.`;
         saveTasksToStorage();
@@ -414,6 +664,8 @@ const saveTask = () => {
 
     closeTaskModal();
     showToast(message, 'success');
+
+    // After adding/updating tasks: ensure timeline expands if necessary (expand-only)
     checkAndUpdateTimeline();
 };
 
@@ -440,36 +692,159 @@ const showContextMenu = (e, taskId) => {
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
 
+    // Robust: set both attribute and global variable
     menu.setAttribute('data-task-id', taskId);
+    contextMenuTaskId = Number(taskId);
+
     menu.classList.remove('hidden');
+};
+
+const openDeleteConfirmModal = (taskId) => {
+    const modal = document.getElementById('delete-confirm-modal');
+    const messageEl = document.getElementById('delete-confirm-message');
+    pendingDeletionTaskId = Number(taskId);
+
+    // Hide context menu if it's visible
+    const ctx = document.getElementById('context-menu');
+    if (ctx) ctx.classList.add('hidden');
+
+    const task = tasks.find(t => Number(t.id) === Number(taskId));
+    if (task) {
+        messageEl.textContent = `Are you sure you want to delete "${task.name}"? This action cannot be undone.`;
+    } else {
+        messageEl.textContent = 'Are you sure you want to delete this task? This action cannot be undone.';
+    }
+
+    modal.classList.remove('hidden');
+
+    // Prevent background scrolling while modal is open
+    document.body.classList.add('modal-open');
+
+    // Focus confirmation button for accessibility
+    setTimeout(() => {
+        const okBtn = document.getElementById('delete-confirm-ok');
+        if (okBtn) okBtn.focus();
+    }, 0);
+
+    // Key handler (Escape to cancel)
+    _deleteModalKeyHandler = (ev) => {
+        if (ev.key === 'Escape') {
+            closeDeleteConfirmModal();
+        }
+    };
+    document.addEventListener('keydown', _deleteModalKeyHandler);
+
+    // Clicking the overlay (but not the modal content) cancels
+    _deleteModalOverlayHandler = (ev) => {
+        if (ev.target && ev.target.id === 'delete-confirm-modal') {
+            closeDeleteConfirmModal();
+        }
+    };
+    modal.addEventListener('click', _deleteModalOverlayHandler);
+};
+
+const closeDeleteConfirmModal = () => {
+    const modal = document.getElementById('delete-confirm-modal');
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    pendingDeletionTaskId = null;
+
+    // restore scrolling
+    document.body.classList.remove('modal-open');
+
+    // remove handlers
+    if (_deleteModalKeyHandler) {
+        document.removeEventListener('keydown', _deleteModalKeyHandler);
+        _deleteModalKeyHandler = null;
+    }
+    if (_deleteModalOverlayHandler) {
+        modal.removeEventListener('click', _deleteModalOverlayHandler);
+        _deleteModalOverlayHandler = null;
+    }
+};
+
+const handleConfirmDelete = () => {
+    if (!pendingDeletionTaskId) {
+        closeDeleteConfirmModal();
+        showToast('No task selected for deletion.', 'error');
+        return;
+    }
+
+    const origTask = tasks.find(t => Number(t.id) === Number(pendingDeletionTaskId));
+    if (!origTask) {
+        closeDeleteConfirmModal();
+        showToast('Task not found. It may already have been removed.', 'error');
+        return;
+    }
+
+    // Remove the task
+    tasks = tasks.filter(t => Number(t.id) !== Number(pendingDeletionTaskId));
+    saveTasksToStorage();
+
+    // Optional: notify server about deletion
+    // sendTaskUpdate({ id: pendingDeletionTaskId, deleted: true });
+
+    showToast(`Task "${origTask.name}" deleted.`, 'success');
+
+    closeDeleteConfirmModal();
+
+    // Recalculate timeline/project bounds and re-render (fit exact)
+    adjustTimelineAfterDeletion();
 };
 
 const handleContextMenuAction = (action) => {
     const menu = document.getElementById('context-menu');
-    const taskId = parseInt(menu.getAttribute('data-task-id'));
-    menu.classList.add('hidden');
-    if (!taskId) return;
+
+    // Prefer robust global id, fall back to attribute
+    let taskId = null;
+    if (contextMenuTaskId !== null && !isNaN(contextMenuTaskId)) {
+        taskId = Number(contextMenuTaskId);
+    } else {
+        const attr = menu ? menu.getAttribute('data-task-id') : null;
+        if (attr !== null) {
+            const parsed = parseInt(attr);
+            if (!isNaN(parsed)) taskId = parsed;
+        }
+    }
+
+    // Hide the menu immediately
+    if (menu) menu.classList.add('hidden');
+
+    // clear global selection so subsequent actions are clean
+    contextMenuTaskId = null;
+    if (menu) menu.removeAttribute('data-task-id');
+
+    if (!taskId && taskId !== 0) {
+        showToast('Unable to determine selected task for that action.', 'error');
+        return;
+    }
 
     if (action === 'Edit') {
         openTaskModal(taskId);
     } else if (action === 'Clone') {
         const originalTask = tasks.find(t => Number(t.id) === Number(taskId));
         if (originalTask) {
-            const newTask = {
-                id: Date.now(),
-                name: `Clone of ${originalTask.name}`,
-                startDate: originalTask.startDate,
-                endDate: originalTask.endDate,
-                description: originalTask.description,
-                completed: false
-            };
-            tasks.push(newTask);
+            // clone must normalize: if original had progress 100 -> completed true
+            const clone = Object.assign({}, originalTask);
+            clone.id = Date.now();
+            // ensure new cloned task is not marked completed if original wasn't; but preserve progress value (unless 100)
+            normalizeTask(clone);
+            // for clones we usually want completed=false so user can adjust; but follow user's choice: preserve state, except ensure unique id
+            // If you prefer clones always be incomplete, set clone.completed = false; clone.progress = clone.progress === null ? 0 : clone.progress;
+            tasks.push(clone);
             saveTasksToStorage();
             // notify server (optional)
-            sendTaskUpdate(newTask);
+            sendTaskUpdate(clone);
             showToast(`Task "${originalTask.name}" cloned successfully.`, 'success');
+            // ensure UI updates even if timeline bounds don't change
             checkAndUpdateTimeline();
+        } else {
+            showToast('Original task not found — cannot clone.', 'error');
         }
+    } else if (action === 'Delete') {
+        // Open in-page confirmation modal (nicer UX than window.confirm)
+        openDeleteConfirmModal(taskId);
     } else {
         showToast(`"${action}" feature is still in development.`, 'info');
     }
@@ -480,7 +855,7 @@ const renderProjectInfo = () => {
     document.getElementById('project-description-display').textContent = currentProject.description || 'No description provided.';
 };
 
-// --- Tasks rendering (unchanged logic, but uses persisted 'tasks') ---
+// --- Tasks rendering (updated ordering so overdue takes precedence over progress) ---
 const renderTasks = () => {
     const taskBarsContainer = document.getElementById('task-bars-container');
     const timelineContainer = document.getElementById('timeline-container');
@@ -497,6 +872,9 @@ const renderTasks = () => {
     today.setHours(0, 0, 0, 0);
 
     tasks.forEach((task, index) => {
+        // Safety normalize before rendering
+        normalizeTask(task);
+
         const taskStart = new Date(task.startDate + 'T00:00:00');
         const taskEnd = new Date(task.endDate + 'T00:00:00');
 
@@ -516,16 +894,28 @@ const renderTasks = () => {
 
             let bgColor, borderColor, labelSuffix, hoverColor = '';
 
+            // Priority of styling:
+            // 1) completed -> green
+            // 2) overdue (taskEnd < today && not completed) -> overdue-red
+            // 3) progress (0..99) -> indigo with percent suffix + overlay
+            // 4) default -> indigo
             if (task.completed) {
                 bgColor = 'bg-secondary-green/70';
                 borderColor = 'border-primary-green';
                 hoverColor = 'hover:bg-primary-green';
                 labelSuffix = ' (Done)';
             } else if (taskEnd < today) {
-                bgColor = 'bg-red-600/70';
+                // Task ended in the past and not completed => overdue regardless of progress percent
+                bgColor = 'bg-overdue-red/70';
                 borderColor = 'border-red-800';
                 hoverColor = 'hover:bg-red-800';
                 labelSuffix = ' (OVERDUE)';
+            } else if (task.progress !== null && typeof task.progress === 'number' && task.progress > 0) {
+                // Show progress percent when >0 (but we already handled >=100 -> completed)
+                bgColor = 'bg-indigo-500/60';
+                borderColor = 'border-indigo-700';
+                hoverColor = 'hover:bg-indigo-700';
+                labelSuffix = ` (${Math.round(task.progress)}%)`;
             } else {
                 bgColor = 'bg-indigo-500/70';
                 borderColor = 'border-indigo-700';
@@ -539,24 +929,37 @@ const renderTasks = () => {
             taskBar.style.left = `${leftPercent.toFixed(2)}%`;
             taskBar.style.width = `${widthPercent.toFixed(2)}%`;
             taskBar.style.top = `${index * STACK_HEIGHT}px`;
+            taskBar.style.overflow = 'hidden';
 
             const startMonth = taskStart.toLocaleString('en-US', { month: 'short' });
             const startDay = taskStart.getDate();
             const endMonth = taskEnd.toLocaleString('en-US', { month: 'short' });
             const endDay = taskEnd.getDate();
 
+            // progress overlay if applicable (show inner fill representing percent)
+            let progressHTML = '';
+            if (!task.completed && typeof task.progress === 'number' && task.progress >= 0) {
+                const pct = Math.max(0, Math.min(100, Math.round(task.progress)));
+                // Do not show overlay if pct === 0
+                if (pct > 0) {
+                    // small darker overlay to indicate progress within the bar
+                    progressHTML = `<div class="absolute left-0 top-0 h-full bg-primary-green/40" style="width: ${pct}%; pointer-events: none;"></div>`;
+                }
+            }
+
             taskBar.innerHTML = `
-                            <div class="h-full flex items-center px-4 overflow-hidden">
+                            ${progressHTML}
+                            <div class="h-full flex items-center px-4 overflow-hidden relative z-10">
                                 <span class="text-white text-xs font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
                                     ${task.name}
                                     ${labelSuffix || ''}
                                 </span>
                             </div>
-                            <div class="absolute top-0 -left-10 flex flex-col items-center w-12">
+                            <div class="absolute top-0 -left-10 flex flex-col items-center w-12 z-10">
                                 <span class="text-xs font-bold text-gray-700">${startMonth}</span>
                                 <span class="text-xs text-gray-700">${startDay}</span>
                             </div>
-                            <div class="absolute top-0 -right-10 flex flex-col items-center w-12">
+                            <div class="absolute top-0 -right-10 flex flex-col items-center w-12 z-10">
                                 <span class="text-xs font-bold text-gray-700">${endMonth}</span>
                                 <span class="text-xs text-gray-700">${endDay}</span>
                             </div>
@@ -716,6 +1119,22 @@ const renderTimeline = (startDateStr, endDateStr) => {
     renderTasks();
 };
 
+// --- New: sort tasks by their actual start date (ascending) and re-render ---
+const sortTasksByStartDate = () => {
+    tasks.sort((a, b) => {
+        const da = new Date(a.startDate + 'T00:00:00');
+        const db = new Date(b.startDate + 'T00:00:00');
+        if (da < db) return -1;
+        if (da > db) return 1;
+        // tie-breaker by id to keep deterministic order
+        return Number(a.id) - Number(b.id);
+    });
+    saveTasksToStorage();
+    // Re-render timeline & tasks (use full render to recalc positions reliably)
+    renderTimeline(currentProject.startDate, currentProject.endDate);
+    showToast('Tasks sorted by start date (earliest at top).', 'success');
+};
+
 // --- Event listeners & initial bootstrapping ---
 document.addEventListener('DOMContentLoaded', async () => {
     // Load persisted state
@@ -741,16 +1160,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('project-mode-current').addEventListener('change', (e) => updateProjectModalState(e.target.value));
     document.getElementById('project-mode-new').addEventListener('change', (e) => updateProjectModalState(e.target.value));
 
+    // Delete-confirm modal listeners
+    const deleteCancel = document.getElementById('delete-confirm-cancel');
+    const deleteOk = document.getElementById('delete-confirm-ok');
+    if (deleteCancel) deleteCancel.addEventListener('click', closeDeleteConfirmModal);
+    if (deleteOk) deleteOk.addEventListener('click', handleConfirmDelete);
+
+    // Scale button - wire to fitTimelineToTasks (fit exact to tasks)
+    const scaleBtn = document.getElementById('open-scale-modal');
+    if (scaleBtn) {
+        // remove any inline onclick to avoid double toasts
+        scaleBtn.removeAttribute('onclick');
+        scaleBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            // Fit timeline exactly to current task bounds (shrinkAllowed = true)
+            fitTimelineToTasks(true);
+        });
+    }
+
+    // Sort button - wire to sortTasksByStartDate
+    const sortBtn = document.getElementById('open-sort-modal');
+    if (sortBtn) {
+        sortBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            sortTasksByStartDate();
+        });
+    }
+
     // Hide context menu when clicking anywhere else
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('context-menu');
         if (menu && !menu.contains(e.target)) {
             menu.classList.add('hidden');
+            // clear global selection on outside click as well
+            contextMenuTaskId = null;
+            if (menu) menu.removeAttribute('data-task-id');
         }
     });
 
     // Hide context menu on scroll
     window.addEventListener('scroll', () => {
-        document.getElementById('context-menu').classList.add('hidden');
+        const menu = document.getElementById('context-menu');
+        if (menu) {
+            menu.classList.add('hidden');
+            contextMenuTaskId = null;
+            menu.removeAttribute('data-task-id');
+        }
     });
 });
