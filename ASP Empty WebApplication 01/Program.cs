@@ -5,6 +5,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // This file defines the complete ASP.NET Core Minimal API server for user registration and login.
@@ -74,6 +75,8 @@ async Task UpdateUsersHtmlFileAsync(string webRootPath, ApplicationDbContext dbC
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors();
+
+builder.Services.AddRouting();
 
 // Configure SQLite database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -241,23 +244,88 @@ app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
     }));
 });
 
-app.MapPost("/projectUpdate", async (context) => 
+app.MapPost("/projectUpdate", async (HttpRequest req) =>
 {
-    var request = context.Request;
-    var cookies = request.Cookies;
-
-    if (cookies != null || cookies.Count == 0)
+    var options = new JsonSerializerOptions
     {
-        Console.WriteLine("Cookies - empty.");
-    }
-    foreach (var cookie in cookies)
+        PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true
+    };
+
+    Project? payload;
+    try
     {
-        Console.WriteLine(cookie.Key + " - " + cookie.Value);
+        payload = await JsonSerializer.DeserializeAsync<Project>(req.Body, options);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error deserializing /projectUpdate payload: " + ex);
+        return Results.BadRequest(new { success = false, error = "Invalid JSON payload" });
     }
 
-    var content = await request.ReadFromJsonAsync<UserTask>();
-    Console.WriteLine(content);
-    await context.Response.WriteAsync("OK");
+    if (payload == null)
+    {
+        Console.WriteLine("Received empty payload on /projectUpdate");
+        return Results.BadRequest(new { success = false, error = "Empty payload" });
+    }
+
+    // Ensure tasks are normalized (enforces invariants like progress/completed)
+    try
+    {
+        payload.NormalizeTasks();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Normalization error: " + ex);
+    }
+
+    // Show received summary on console
+    Console.WriteLine("=== /projectUpdate Received ===");
+    Console.WriteLine($"ClientTimestamp: {payload.ClientTimestamp?.ToString("o") ?? "(none)"}");
+
+    if (payload.ProjectInfo != null)
+    {
+        Console.WriteLine("-- Project Info --");
+        Console.WriteLine($"Name       : {payload.ProjectInfo.Name}");
+        Console.WriteLine($"StartDate  : {payload.ProjectInfo.StartDate}");
+        Console.WriteLine($"EndDate    : {payload.ProjectInfo.EndDate}");
+        Console.WriteLine($"Description: {payload.ProjectInfo.Description}");
+    }
+    else
+    {
+        Console.WriteLine("No project info provided.");
+    }
+
+    var taskCount = payload.Tasks?.Count ?? 0;
+    Console.WriteLine($"Tasks count: {taskCount}");
+
+    if (taskCount > 0 && payload.Tasks != null)
+    {
+        Console.WriteLine("-- Tasks --");
+        foreach (var t in payload.Tasks)
+        {
+            Console.WriteLine($"Id: {t.Id}");
+            Console.WriteLine($"  Name      : {t.Name}");
+            Console.WriteLine($"  StartDate : {t.StartDate}");
+            Console.WriteLine($"  EndDate   : {t.EndDate}");
+            Console.WriteLine($"  Completed : {t.Completed}");
+            Console.WriteLine($"  Progress  : {(t.Progress.HasValue ? t.Progress.Value.ToString() : "null")}");
+            Console.WriteLine($"  Description: {t.Description}");
+        }
+    }
+
+    if (payload.LastUpdatedTask != null)
+    {
+        var lu = payload.LastUpdatedTask;
+        Console.WriteLine("-- LastUpdatedTask --");
+        Console.WriteLine($"Id: {lu.Id}, Name: {lu.Name}, Completed: {lu.Completed}, Progress: {(lu.Progress.HasValue ? lu.Progress.Value.ToString() : "null")}");
+    }
+
+    Console.WriteLine("=== End payload ===");
+
+    // Return a simple acknowledgement. If you want to return server-side processed / authoritative state,
+    // replace this with the appropriate DTO.
+    return Results.Ok(new { success = true, receivedTasks = taskCount });
 });
 
 // Default route to serve the main HTML file

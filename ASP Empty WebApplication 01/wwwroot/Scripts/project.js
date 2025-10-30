@@ -164,21 +164,48 @@ function saveProjectToStorage() {
 }
 
 // --- Network: send single task update to server (keeps behavior from original file) ---
-async function sendTaskUpdate(taskObj) {
-    // If you want to stop sending to the server (e.g., offline-only local storage), you can early-return here.
+// Replaced sendTaskUpdate to send the full tasks collection and currentProject.
+// Keeps optional parameter for backward compatibility (lastUpdatedTask will be included when provided).
+async function sendTaskUpdate(lastUpdatedTask = null) {
+    // Persist current local state before sending so server receives the latest copy
+    try {
+        saveTasksToStorage();
+    } catch (e) {
+        console.warn('Could not persist tasks before sending update:', e);
+    }
+    try {
+        saveProjectToStorage();
+    } catch (e) {
+        console.warn('Could not persist project before sending update:', e);
+    }
+
+    const payload = {
+        tasks: tasks, // full collection (already normalized when saved)
+        project: currentProject,
+        lastUpdatedTask: lastUpdatedTask || null,
+        clientTimestamp: new Date().toISOString()
+    };
+
     try {
         const response = await fetch(REMOTE_UPDATE_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(taskObj)
+            body: JSON.stringify(payload)
         });
-        // optional: handle server response
+
+        if (!response.ok) {
+            // non-2xx responses are still considered "successful fetch" but report them
+            console.warn(`projectUpdate returned status ${response.status}`);
+        }
+
         return response;
     } catch (error) {
-        console.error('Failed to send task update:', error);
-        // ignore network failure — localStorage remains authoritative
+        // Network / fetch error — keep local storage authoritative but surface the problem to console
+        console.error('Failed to send projectUpdate payload:', error);
+        // Optionally you could return a rejected promise or a custom object to indicate failure
+        return null;
     }
 }
 
