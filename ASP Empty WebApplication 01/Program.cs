@@ -280,52 +280,10 @@ app.MapPost("/projectUpdate", async (HttpRequest req) =>
     }
 
     // Show received summary on console
-    Console.WriteLine("=== /projectUpdate Received ===");
-    Console.WriteLine($"ClientTimestamp: {payload.ClientTimestamp?.ToString("o") ?? "(none)"}");
+    Console.WriteLine(ProjectLogger.GenerateLogString(payload));
 
-    if (payload.ProjectInfo != null)
-    {
-        Console.WriteLine("-- Project Info --");
-        Console.WriteLine($"Name       : {payload.ProjectInfo.Name}");
-        Console.WriteLine($"StartDate  : {payload.ProjectInfo.StartDate}");
-        Console.WriteLine($"EndDate    : {payload.ProjectInfo.EndDate}");
-        Console.WriteLine($"Description: {payload.ProjectInfo.Description}");
-    }
-    else
-    {
-        Console.WriteLine("No project info provided.");
-    }
-
-    var taskCount = payload.Tasks?.Count ?? 0;
-    Console.WriteLine($"Tasks count: {taskCount}");
-
-    if (taskCount > 0 && payload.Tasks != null)
-    {
-        Console.WriteLine("-- Tasks --");
-        foreach (var t in payload.Tasks)
-        {
-            Console.WriteLine($"Id: {t.Id}");
-            Console.WriteLine($"  Name      : {t.Name}");
-            Console.WriteLine($"  StartDate : {t.StartDate}");
-            Console.WriteLine($"  EndDate   : {t.EndDate}");
-            Console.WriteLine($"  Completed : {t.Completed}");
-            Console.WriteLine($"  Progress  : {(t.Progress.HasValue ? t.Progress.Value.ToString() : "null")}");
-            Console.WriteLine($"  Description: {t.Description}");
-        }
-    }
-
-    if (payload.LastUpdatedTask != null)
-    {
-        var lu = payload.LastUpdatedTask;
-        Console.WriteLine("-- LastUpdatedTask --");
-        Console.WriteLine($"Id: {lu.Id}, Name: {lu.Name}, Completed: {lu.Completed}, Progress: {(lu.Progress.HasValue ? lu.Progress.Value.ToString() : "null")}");
-    }
-
-    Console.WriteLine("=== End payload ===");
-
-    // Return a simple acknowledgement. If you want to return server-side processed / authoritative state,
-    // replace this with the appropriate DTO.
-    return Results.Ok(new { success = true, receivedTasks = taskCount });
+    // Return a simple acknowledgement. Replace this with the appropriate DTO.
+    return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count});
 });
 
 // Default route to serve the main HTML file

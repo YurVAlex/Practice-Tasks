@@ -14,7 +14,8 @@
 // If you want to try server-side syncing on load, set to true and supply a matching endpoint.
 const REMOTE_SYNC_ON_LOAD = false;
 const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
-const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendTaskUpdate
+const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendProjectUpdate();
+
 
 // --- Storage keys (version these if you change the shape later) ---
 const STORAGE_KEY_TASKS = 'timeline_tasks_v1';
@@ -163,26 +164,11 @@ function saveProjectToStorage() {
     }
 }
 
-// --- Network: send single task update to server (keeps behavior from original file) ---
-// Replaced sendTaskUpdate to send the full tasks collection and currentProject.
-// Keeps optional parameter for backward compatibility (lastUpdatedTask will be included when provided).
-async function sendTaskUpdate(lastUpdatedTask = null) {
-    // Persist current local state before sending so server receives the latest copy
-    try {
-        saveTasksToStorage();
-    } catch (e) {
-        console.warn('Could not persist tasks before sending update:', e);
-    }
-    try {
-        saveProjectToStorage();
-    } catch (e) {
-        console.warn('Could not persist project before sending update:', e);
-    }
+async function sendProjectUpdate() {
 
     const payload = {
-        tasks: tasks, // full collection (already normalized when saved)
+        tasks: tasks, 
         project: currentProject,
-        lastUpdatedTask: lastUpdatedTask || null,
         clientTimestamp: new Date().toISOString()
     };
 
@@ -474,6 +460,8 @@ const handleProjectModalOk = () => {
     renderProjectInfo();
     renderTimeline(currentProject.startDate, currentProject.endDate);
     showToast(`Project boundaries successfully updated.`, 'info');
+    sendProjectUpdate();
+    
 };
 
 // --- QUICK SCALE modal helpers (new) ---
@@ -537,6 +525,7 @@ const handleScaleModalOk = () => {
 
     showToast('Timeline updated.', 'success');
     closeScaleModal();
+    sendProjectUpdate();
 };
 
 // --- Task modal (add/edit) ---
@@ -721,8 +710,6 @@ const saveTask = () => {
             normalizeTask(taskToUpdate);
             message = `Task "${taskName}" updated successfully.`;
             saveTasksToStorage();
-            // SEND TO SERVER (optional)
-            sendTaskUpdate(taskToUpdate);
         }
     } else {
         // Add new task
@@ -741,8 +728,6 @@ const saveTask = () => {
         tasks.push(newTask);
         message = `New task "${taskName}" added successfully.`;
         saveTasksToStorage();
-        // SEND TO SERVER (optional)
-        sendTaskUpdate(newTask);
     }
 
     closeTaskModal();
@@ -750,6 +735,7 @@ const saveTask = () => {
 
     // After adding/updating tasks: ensure timeline expands if necessary (expand-only)
     checkAndUpdateTimeline();
+    sendProjectUpdate();
 };
 
 // --- Context menu logic (Clone persists to storage) ---
@@ -872,9 +858,6 @@ const handleConfirmDelete = () => {
     tasks = tasks.filter(t => Number(t.id) !== Number(pendingDeletionTaskId));
     saveTasksToStorage();
 
-    // Optional: notify server about deletion
-    // sendTaskUpdate({ id: pendingDeletionTaskId, deleted: true });
-
     showToast(`Task "${origTask.name}" deleted.`, 'success');
 
     closeDeleteConfirmModal();
@@ -882,6 +865,7 @@ const handleConfirmDelete = () => {
     // Recalculate timeline/project bounds and re-render (fit exact).
     // fitTimelineToTasks(true) will call renderTimeline which calls renderTasks().
     adjustTimelineAfterDeletion();
+    sendProjectUpdate();
 };
 
 const handleContextMenuAction = (action) => {
@@ -922,11 +906,10 @@ const handleContextMenuAction = (action) => {
             normalizeTask(clone);
             tasks.push(clone);
             saveTasksToStorage();
-            // notify server (optional)
-            sendTaskUpdate(clone);
             showToast(`Task "${originalTask.name}" cloned successfully.`, 'success');
             // ensure UI updates even if timeline bounds don't change
             checkAndUpdateTimeline();
+            sendProjectUpdate();
         } else {
             showToast('Original task not found — cannot clone.', 'error');
         }
@@ -1339,6 +1322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderProjectInfo();
     renderTimeline(currentProject.startDate, currentProject.endDate);
+    sendProjectUpdate();
 
     // Task Modal listeners
     document.getElementById('open-task-modal').addEventListener('click', () => openTaskModal(null));
@@ -1382,6 +1366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ev.preventDefault();
             // Fit timeline exactly to current task bounds (shrinkAllowed = true)
             fitTimelineToTasks(true);
+            sendProjectUpdate();
         });
     }
 
@@ -1391,6 +1376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         sortBtn.addEventListener('click', (ev) => {
             ev.preventDefault();
             sortTasksByStartDate();
+            sendProjectUpdate();
         });
     }
 
