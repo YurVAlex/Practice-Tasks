@@ -6,35 +6,35 @@
     <link rel="stylesheet" href="styles/login.css">
 </head>
 <body>
-    <div class="form-container">
+    <div class="form-container" id="formContainer">
         <h1 id="page-title">User Login</h1>
 
-        <form id="mainForm" name="mainForm" action="#" onsubmit="submitForm(event)">
+        <form id="mainForm" name="mainForm" action="#" onsubmit="submitForm(event)" novalidate>
             <div class="form-group hidden" id="nameGroup">
                 <label for="name">Name:</label>
-                <input type="text" id="name" name="name" maxlength="30" minlength="3">
+                <input type="text" id="name" name="name" maxlength="30" minlength="3" autocomplete="name">
                 <div class="error-message" id="name-error">Name must be between 3 and 30 characters long.</div>
                 <div class="success-message" id="name-success">✓ Name is valid</div>
             </div>
 
             <div class="form-group">
                 <label for="email">Email:</label>
-                <input type="email" id="email" name="email" maxlength="255" required autofocus>
+                <input type="email" id="email" name="email" maxlength="255" required autocomplete="email" autofocus>
                 <div class="error-message" id="email-error">Please enter a valid email address.</div>
                 <div class="success-message" id="email-success">✓ Email is valid</div>
             </div>
 
             <div class="form-group">
                 <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
                 <div class="password-requirements" id="passwordRequirements">Password must contain: 8-128 characters, one uppercase letter, one lowercase letter, one number, one special character.</div>
-                <div class="error-message" id="password-error">Password is required.</div>
+                <div class="error-message" id="password-error">Password is required or does not meet requirements.</div>
                 <div class="success-message" id="password-success">✓ Password is valid</div>
             </div>
 
             <div class="form-group hidden" id="confirmPasswordGroup">
                 <label for="confirmPassword">Confirm Password:</label>
-                <input type="password" id="confirmPassword" name="confirmPassword">
+                <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password">
                 <div class="error-message" id="confirmPassword-error">Passwords do not match.</div>
                 <div class="success-message" id="confirmPassword-success">✓ Passwords match</div>
             </div>
@@ -49,7 +49,11 @@
         </div>
     </div>
 
+    <!-- Status toast container moved OUTSIDE form container to avoid layout conflicts -->
+    <div id="statusToast" class="status-hidden" role="status" aria-live="polite" aria-atomic="true">
+        <p id="statusMessage" class="status-text"></p>
+    </div>
+
     <script src="scripts/login.js" defer></script>
-    
 </body>
 </html>

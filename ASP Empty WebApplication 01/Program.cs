@@ -18,6 +18,7 @@ builder.Services.AddRouting();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+
 var app = builder.Build();
 
 // Ensure the database is created and migrations are applied
@@ -37,18 +38,12 @@ app.UseStaticFiles(); // Enable serving static files from wwwroot
 
 // --- API Endpoints ---
 
-// Registration endpoint
-app.MapPost("/register/{name}/{email}/{password}", async (string name, string email, string password, ApplicationDbContext dbContext) =>
+// Registration endpoint: Accepts JSON in the body
+app.MapPost("/register", async (User newUser, ApplicationDbContext dbContext) =>
 {
-    // 1. Construct a temporary user for validation
-    var newUser = new User
-    {
-        Name = name,
-        Email = email,
-        Password = password
-    };
-
-    // 2. Perform validation against data annotations in the User model
+    // 1. Model Binding and Validation
+    // ASP.NET Core Minimal APIs automatically deserialize the JSON body into the 'newUser' object.
+    // The validation context is needed to check Data Annotations manually.
     var validationContext = new ValidationContext(newUser, serviceProvider: null, items: null);
     var validationResults = new List<ValidationResult>();
     bool isValid = Validator.TryValidateObject(newUser, validationContext, validationResults, true);
@@ -61,18 +56,23 @@ app.MapPost("/register/{name}/{email}/{password}", async (string name, string em
 
     try
     {
-        // 3. Check for existing user with the same email
+        // 2. Check for existing user with the same email
         if (await dbContext.Users.AnyAsync(u => u.Email == newUser.Email))
         {
             return Results.Conflict(new { error = "User with this email already exists." });
         }
 
-        // 4. Save to database
+        // Ensure default JSON fields are set if the client didn't provide them (User model handles required properties)
+        if (newUser.Settings == null) newUser.Settings = "{}";
+        if (newUser.Pages == null) newUser.Pages = "{}";
+        if (newUser.Links == null) newUser.Links = "{}";
+
+        // 3. Save to database
         dbContext.Users.Add(newUser);
         await dbContext.SaveChangesAsync();
-        
+
         Console.WriteLine($"New user registered: {newUser.Name} ({newUser.Email}) - ID: {newUser.ID}");
-        
+
         // Return the created user as JSON
         return Results.Json(new
         {
@@ -89,29 +89,16 @@ app.MapPost("/register/{name}/{email}/{password}", async (string name, string em
     }
 });
 
-// Login endpoint
-
-app.MapPost("/login/{email}/{password}", async (string email, string password, ApplicationDbContext dbContext) =>
+// Login endpoint: Accepts JSON in the body
+app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContext) =>
 {
-    // 1. Validation Setup (using User model's constraints)
-    var loginAttemptUser = new User 
-    {
-        // Name is required by the User model, so we provide a dummy value 
-        // to allow validation of Email and Password to proceed.
-        Name = "LoginAttempt", 
-        Email = email,
-        Password = password
-    };
-    
-    var validationContext = new ValidationContext(loginAttemptUser, serviceProvider: null, items: null);
+    // 1. Model Binding and Validation (via LoginModel DTO)
+    var validationContext = new ValidationContext(loginData, serviceProvider: null, items: null);
     var validationResults = new List<ValidationResult>();
-    
-    // Check if the provided email/password strings satisfy the model's data annotations
-    bool isValid = Validator.TryValidateObject(loginAttemptUser, validationContext, validationResults, true);
+    bool isValid = Validator.TryValidateObject(loginData, validationContext, validationResults, true);
 
     if (!isValid)
     {
-        // Extract validation errors and return 400 Bad Request
         var errors = validationResults.Select(r => r.ErrorMessage).ToList();
         Console.WriteLine($"Login validation failed: {string.Join(", ", errors)}");
         return Results.BadRequest(new { error = "Invalid data format.", details = errors });
@@ -120,22 +107,19 @@ app.MapPost("/login/{email}/{password}", async (string email, string password, A
     try
     {
         // 2. Database Lookup
-        // Find the user by both Email and (plain text) Password
-        // NOTE: In a production app, the password should be HASHED in the DB and verified using a hash comparison!
         var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Email == email && u.Password == password);
+            .FirstOrDefaultAsync(u => u.Email == loginData.Email && u.Password == loginData.Password);
 
         if (user == null)
         {
             // 3. Login Failed
-            Console.WriteLine($"Login failed for email: {email} (Invalid credentials)");
-            // Use Unauthorized (401) or Forbidden (403) for failed authentication/authorization
-            return Results.BadRequest(new { error = "Invalid e-mail or password."});
+            Console.WriteLine($"Login failed for email: {loginData.Email} (Invalid credentials)");
+            return Results.BadRequest(new { error = "Invalid e-mail or password." });
         }
-        
+
         // 4. Login Successful
         Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}");
-        
+
         // Return the essential user details
         return Results.Json(new
         {
@@ -148,15 +132,14 @@ app.MapPost("/login/{email}/{password}", async (string email, string password, A
     catch (Exception ex)
     {
         Console.WriteLine($"Error during login: {ex.Message}");
-        // Return 500 Internal Server Error for unhandled exceptions
         return Results.Problem("An internal server error occurred during login.");
     }
 });
 
+
 // Users endpoint - display registered users in HTML
 app.MapGet("/users", async (HttpContext context, ApplicationDbContext dbContext) =>
 {
-    // Update the Users.html file using the new FileProcessor class
     await FileProcessor.UpdateUsersHtmlFileAsync(builder.Environment.WebRootPath, dbContext);
     await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Users.html");
 });
@@ -170,10 +153,11 @@ app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
         id = u.ID,
         name = u.Name,
         email = u.Email,
-        registrationDate = DateTime.Now // You might want to add a registration date field to User model
+        registrationDate = DateTime.Now // Placeholder date
     }));
 });
 
+// projectUpdate and default route remain unchanged
 app.MapPost("/projectUpdate", async (HttpRequest req) =>
 {
     var options = new JsonSerializerOptions
@@ -213,7 +197,12 @@ app.MapPost("/projectUpdate", async (HttpRequest req) =>
     Console.WriteLine(ProjectLogger.GenerateLogString(payload));
 
     // Return a simple acknowledgement. Replace this with the appropriate DTO.
-    return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count});
+    return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count });
+});
+
+app.MapGet("/getProject", async (HttpContext context) =>
+{
+    await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/TaskManager.html");
 });
 
 // Default route to serve the main HTML file
