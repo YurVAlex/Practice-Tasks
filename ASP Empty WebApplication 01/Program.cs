@@ -228,7 +228,6 @@ app.MapGet("/users", async (HttpContext context, ApplicationDbContext dbContext)
     // Update the Users.html file
     await UpdateUsersHtmlFileAsync(builder.Environment.WebRootPath, dbContext);
     await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Users.html");
-    
 });
 
 // API endpoint to get all registered users as JSON

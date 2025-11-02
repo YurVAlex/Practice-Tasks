@@ -9,7 +9,6 @@ function toggleMode() {
     const nameGroup = document.getElementById('nameGroup');
     const confirmPasswordGroup = document.getElementById('confirmPasswordGroup');
     const passwordRequirements = document.getElementById('passwordRequirements');
-    const viewRegistrationsBtn = document.getElementById('viewRegistrations');
     const pageTitle = document.getElementById('page-title');
     const modeToggleBtn = document.getElementById('modeToggleBtn');
     const mainSubmitBtn = document.getElementById('mainSubmit');

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/project.css">
+</head>
+<body>
+
+        <!-- Current state panel -->
+        <div class="text-2xl font-extrabold text-gray-800 mb-2">
+            <span id="project-name-display" class="text-gray-800">This feature is still under development.</span>
+        </div>
+
+        <div class="w-full mt-2 p-3 md:p-1 bg-white rounded-xl shadow-2xl">
+
+            <!-- Control panel -->
+            <div class="flex items-center gap-2 mb-10 p-1 bg-gray-50 rounded-lg flex-wrap ">
+
+                <button id="show-users" onclick="showRegistrations()" class="px-2 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150 flex items-center gap-1">
+                    <img src="PNG/Personnel.png" class="icon-img"> Users
+                </button>
+
+                <!-- Flexible spacer pushes the Project button to the far right -->
+                <div class="flex-1"></div>
+
+                <button id="open-languages-modal" class="px-2 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150 flex items-center gap-1"
+                        onclick="showToast('This feature is still under development.', 'error');">
+                    <img src="PNG/Globe.png" class="icon-img">
+                </button>
+
+                <button id="dark-mode" class="px-2 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150 flex items-center gap-1"
+                        onclick="showToast('This feature is still under development.', 'error');">
+                    <img src="PNG/Dark.png" class="icon-img">
+                </button>
+            </div>
+
+            <!-- Main info panel -->
+            <div id="main-info-container" class="relative w-full min-h-[60vh] my-2">
+                <p>This feature is still under development.</p>
+            </div>
+        </div>
+
+        <!-- Auxiliary info panel-->
+        <div class="w-full mt-3 p-4 md:p-3 bg-white rounded-xl shadow-xl border-t-4 border-gray-400">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">This feature is still under development.</h3>
+            <p id="project-description-display" class="text-gray-600 italic">This feature is still under development.</p>
+        </div>
+    
+    <script>
+        function showRegistrations() {
+            window.open("http://localhost:5146/users", "_blank", "width=400,height=1200,left=1000,top=100");
+        }
+    </script>
+
+</body>
+</html>
