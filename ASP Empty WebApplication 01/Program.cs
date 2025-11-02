@@ -1,75 +1,11 @@
 using ASP_Empty_WebApplication_01.Data;
 using ASP_Empty_WebApplication_01.Models;
+using ASP_Empty_WebApplication_01.Utilites;
 using Microsoft.EntityFrameworkCore;
-using System;
 using System.ComponentModel.DataAnnotations;
-using System.Net;
-using System.Text;
 using System.Text.Json;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
-// This file defines the complete ASP.NET Core Minimal API server for user registration and login.
-
-// --- Helper Functions ---
-
-/// <summary>
-/// Generates the HTML content for displaying all registered users.
-/// </summary>
-/// <param name="users">A list of User entities.</param>
-/// <returns>HTML string for the users page.</returns>
-string GenerateUsersHtml(List<User> users)
-{
-    StringBuilder sb = new StringBuilder();
-    sb.AppendLine("<!DOCTYPE html>");
-    sb.AppendLine("<html>");
-    sb.AppendLine("<head>");
-    sb.AppendLine("    <meta charset='utf-8' />");
-    sb.AppendLine("    <title>Registered Users</title>");
-    sb.AppendLine("    <style>");
-    sb.AppendLine("        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }");
-    sb.AppendLine("        .user-card { background-color: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }");
-    sb.AppendLine("        .user-name { font-weight: bold; color: #333; font-size: 18px; }");
-    sb.AppendLine("        .user-email { color: #666; margin: 5px 0; }");
-    sb.AppendLine("        .user-id { color: #888; font-size: 12px; }");
-    sb.AppendLine("    </style>");
-    sb.AppendLine("</head>");
-    sb.AppendLine("<body>");
-    sb.AppendLine("    <h1>Registered Users</h1>");
-
-    if (users.Count == 0)
-    {
-        sb.AppendLine("    <p>No users registered yet.</p>");
-    }
-    else
-    {
-        foreach (var user in users)
-        {
-            sb.AppendLine("    <div class='user-card'>");
-            sb.AppendLine($"        <p class='user-name'>{user.Name}</p>");
-            sb.AppendLine($"        <p class='user-email'>Email: {user.Email}</p>");
-            sb.AppendLine($"        <p class='user-id'>ID: {user.ID}</p>");
-            sb.AppendLine("    </div>");
-        }
-    }
-
-    sb.AppendLine("</body>");
-    sb.AppendLine("</html>");
-    return sb.ToString();
-}
-
-/// <summary>
-/// Updates the static Users.html file with the current list of registered users.
-/// </summary>
-/// <param name="webRootPath">The path to the wwwroot folder.</param>
-/// <param name="dbContext">The application's database context.</param>
-/// <returns>A Task representing the asynchronous operation.</returns>
-async Task UpdateUsersHtmlFileAsync(string webRootPath, ApplicationDbContext dbContext)
-{
-    var users = await dbContext.Users.ToListAsync();
-    string htmlContent = GenerateUsersHtml(users);
-    string filePath = Path.Combine(webRootPath, "Users.html");
-    await File.WriteAllTextAsync(filePath, htmlContent);
-}
+// This file defines the complete ASP.NET Core Minimal API server for ProTimeline app.
 
 // --- Application Setup ---
 
@@ -81,7 +17,6 @@ builder.Services.AddRouting();
 // Configure SQLite database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 
 var app = builder.Build();
 
@@ -99,8 +34,6 @@ app.UseCors(policy => policy
 // Configure the HTTP request pipeline.
 app.UseHttpsRedirection();
 app.UseStaticFiles(); // Enable serving static files from wwwroot
-
-
 
 // --- API Endpoints ---
 
@@ -156,9 +89,8 @@ app.MapPost("/register/{name}/{email}/{password}", async (string name, string em
     }
 });
 
-// ***************************************************************
-// NEW: Login endpoint
-// ***************************************************************
+// Login endpoint
+
 app.MapPost("/login/{email}/{password}", async (string email, string password, ApplicationDbContext dbContext) =>
 {
     // 1. Validation Setup (using User model's constraints)
@@ -221,12 +153,11 @@ app.MapPost("/login/{email}/{password}", async (string email, string password, A
     }
 });
 
-
 // Users endpoint - display registered users in HTML
 app.MapGet("/users", async (HttpContext context, ApplicationDbContext dbContext) =>
 {
-    // Update the Users.html file
-    await UpdateUsersHtmlFileAsync(builder.Environment.WebRootPath, dbContext);
+    // Update the Users.html file using the new FileProcessor class
+    await FileProcessor.UpdateUsersHtmlFileAsync(builder.Environment.WebRootPath, dbContext);
     await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/Users.html");
 });
 
