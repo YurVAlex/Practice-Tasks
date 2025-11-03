@@ -285,7 +285,7 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
             bootstrap = new
             {
                 tasks = Array.Empty<object>(),
-                project = new { name = "New Project", startDate = DateTime.UtcNow.ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
+                project = new { name = "New Project", startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
                 clientTimestamp = DateTimeOffset.UtcNow
             };
         }
@@ -295,7 +295,7 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
         bootstrap = new
         {
             tasks = Array.Empty<object>(),
-            project = new { name = "New Project", startDate = DateTime.UtcNow.ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
+            project = new { name = "New Project", startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
             clientTimestamp = DateTimeOffset.UtcNow
         };
     }
