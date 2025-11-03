@@ -1,11 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>ASP_Empty_WebApplication_01</RootNamespace>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>ASP_Empty_WebApplication_01</RootNamespace>
+    <!-- Workaround for MSB4018 DiscoverPrecompressedAssets duplicate-key issue -->
+    <GenerateCompressedAssetsOnBuild>false</GenerateCompressedAssetsOnBuild>
+    <GeneratePublishedCompressedAssets>false</GeneratePublishedCompressedAssets>
+    <StaticWebAssetsEnableCompression>false</StaticWebAssetsEnableCompression>
+    <EnablePreCompressedAssets>false</EnablePreCompressedAssets>
+	</PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />

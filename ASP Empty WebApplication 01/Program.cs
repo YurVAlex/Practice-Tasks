@@ -1,3 +1,4 @@
+using ASP_Empty_WebApplication_01;
 using ASP_Empty_WebApplication_01.Data;
 using ASP_Empty_WebApplication_01.Models;
 using ASP_Empty_WebApplication_01.Utilites;
@@ -73,12 +74,17 @@ app.MapPost("/register", async (User newUser, ApplicationDbContext dbContext) =>
 
         Console.WriteLine($"New user registered: {newUser.Name} ({newUser.Email}) - ID: {newUser.ID}");
 
-        // Return the created user as JSON
+        // Create a session for this new user
+        var session = new Session(newUser.ID);
+        SessionManager.Sessions.Add(session);
+
+        // Return the created user and session id
         return Results.Json(new
         {
             id = newUser.ID,
             name = newUser.Name,
             email = newUser.Email,
+            sessionId = session.Id,
             message = "Registration successful!"
         });
     }
@@ -120,12 +126,16 @@ app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContex
         // 4. Login Successful
         Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}");
 
-        // Return the essential user details
+        // Create a new session and return it to the client
+        var session = new Session(user.ID);
+        SessionManager.Sessions.Add(session);
+
         return Results.Json(new
         {
             id = user.ID,
             name = user.Name,
             email = user.Email,
+            sessionId = session.Id,
             message = "Login successful!"
         });
     }
@@ -158,7 +168,7 @@ app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
 });
 
 // projectUpdate and default route remain unchanged
-app.MapPost("/projectUpdate", async (HttpRequest req) =>
+app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbContext) =>
 {
     var options = new JsonSerializerOptions
     {
@@ -196,13 +206,116 @@ app.MapPost("/projectUpdate", async (HttpRequest req) =>
     // Show received summary on console
     Console.WriteLine(ProjectLogger.GenerateLogString(payload));
 
-    // Return a simple acknowledgement. Replace this with the appropriate DTO.
-    return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count });
+    // Identify the user by session id provided either as query string or header
+    var sessionIdStr = req.Query["sessionId"].ToString();
+    if (string.IsNullOrWhiteSpace(sessionIdStr))
+    {
+        sessionIdStr = req.Headers["X-Session-Id"].ToString();
+    }
+
+    if (!Guid.TryParse(sessionIdStr, out var sessionId))
+    {
+        return Results.BadRequest(new { success = false, error = "Missing or invalid session identifier. Provide '?sessionId=...' or 'X-Session-Id' header." });
+    }
+
+    var session = SessionManager.Sessions.FirstOrDefault(s => s.Id == sessionId);
+    if (session == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    // Find the user
+    var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
+    if (user == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    // Persist the received Project payload as a JSON string in the Pages field
+    string payloadJson;
+    try
+    {
+        payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = null,
+            WriteIndented = false
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error serializing Project payload: " + ex);
+        return Results.Problem("Failed to serialize project payload.");
+    }
+
+    user.Pages = payloadJson;
+    await dbContext.SaveChangesAsync();
+
+    // Return a simple acknowledgement including which user was updated
+    return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count, savedFor = user.Email });
 });
 
-app.MapGet("/getProject", async (HttpContext context) =>
+app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbContext) =>
 {
-    await context.Response.SendFileAsync(builder.Environment.WebRootPath + "/TaskManager.html");
+    var sessionIdStr = context.Request.Query["sessionId"].ToString();
+    if (string.IsNullOrWhiteSpace(sessionIdStr))
+    {
+        sessionIdStr = context.Request.Headers["X-Session-Id"].ToString();
+    }
+
+    Guid.TryParse(sessionIdStr, out var sessionId);
+    var session = SessionManager.Sessions.FirstOrDefault(s => s.Id == sessionId);
+
+    // Load base HTML
+    var path = Path.Combine(builder.Environment.WebRootPath, "TaskManager.html");
+    var html = await File.ReadAllTextAsync(path);
+
+    // Resolve user's stored project data (if any)
+    object bootstrap;
+    Guid? userId = null;
+    if (session != null)
+    {
+        userId = session.UserID;
+        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
+        if (user != null && !string.IsNullOrWhiteSpace(user.Pages) && user.Pages.Trim() != "{}")
+        {
+            bootstrap = JsonSerializer.Deserialize<JsonElement>(user.Pages);
+        }
+        else
+        {
+            bootstrap = new
+            {
+                tasks = Array.Empty<object>(),
+                project = new { name = "New Project", startDate = DateTime.UtcNow.ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
+                clientTimestamp = DateTimeOffset.UtcNow
+            };
+        }
+    }
+    else
+    {
+        bootstrap = new
+        {
+            tasks = Array.Empty<object>(),
+            project = new { name = "New Project", startDate = DateTime.UtcNow.ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
+            clientTimestamp = DateTimeOffset.UtcNow
+        };
+    }
+
+    // Injection script for initial data and session id
+    var injection = "<script>window.__INITIAL_DATA__ = " + JsonSerializer.Serialize(bootstrap) + "; window.__SESSION_ID__ = '" + (session?.Id.ToString() ?? "") + "';</script>";
+
+    // Insert before closing body tag
+    var idx = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+    if (idx >= 0)
+    {
+        html = html.Insert(idx, injection);
+    }
+    else
+    {
+        html += injection;
+    }
+
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.WriteAsync(html);
 });
 
 // Default route to serve the main HTML file

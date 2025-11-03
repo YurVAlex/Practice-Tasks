@@ -142,9 +142,16 @@ async function registerUser() {
 
         if (response.ok) {
             const newUser = await response.json();
-            displayStatus(`Registration successful! User ID: ${String(newUser.id || '').substring(0, 8)} ${newUser.message || ''}`, 'success');
-            document.getElementById('mainForm').reset();
-            validateForm(); // Reset button state and validation indicators
+            // store session id for subsequent authenticated calls
+            try {
+                if (newUser && newUser.sessionId) {
+                    localStorage.setItem('session_id_v1', String(newUser.sessionId));
+                }
+            } catch (e) { }
+            displayStatus(`Registration successful! Welcome, ${newUser.name || ''}. Redirecting...`, 'success');
+            // Redirect to TaskManager (include sessionId as query for initial load)
+            const sid = newUser && newUser.sessionId ? String(newUser.sessionId) : '';
+            window.location.href = `/getProject${sid ? (`?sessionId=${encodeURIComponent(sid)}`) : ''}`;
         } else {
             let errorText = 'Please try again.';
             try {
@@ -183,8 +190,15 @@ async function loginUser() {
 
         if (response.ok) {
             const userData = await response.json();
+            // store session id for subsequent authenticated calls
+            try {
+                if (userData && userData.sessionId) {
+                    localStorage.setItem('session_id_v1', String(userData.sessionId));
+                }
+            } catch (e) { }
             displayStatus(`Login successful! Welcome, ${userData.name || 'User'}!`, 'success');
-            window.location.href = "/getProject";
+            const sid = userData && userData.sessionId ? String(userData.sessionId) : '';
+            window.location.href = `/getProject${sid ? (`?sessionId=${encodeURIComponent(sid)}`) : ''}`;
         } else {
             let errorText = 'Invalid credentials or server issue.';
             try {

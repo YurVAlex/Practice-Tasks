@@ -16,6 +16,20 @@ const REMOTE_SYNC_ON_LOAD = false;
 const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
 const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendProjectUpdate();
 
+// Session support: read from server injection or fallback to localStorage
+const SESSION_STORAGE_KEY = 'session_id_v1';
+let SESSION_ID = '';
+try {
+    if (typeof window !== 'undefined' && window.__SESSION_ID__ && String(window.__SESSION_ID__).length > 0) {
+        SESSION_ID = String(window.__SESSION_ID__);
+        localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
+    } else {
+        SESSION_ID = localStorage.getItem(SESSION_STORAGE_KEY) || '';
+    }
+} catch (e) {
+    // ignore storage errors
+}
+
 
 // --- Storage keys (version these if you change the shape later) ---
 const STORAGE_KEY_TASKS = 'timeline_tasks_v1';
@@ -176,7 +190,8 @@ async function sendProjectUpdate() {
         const response = await fetch(REMOTE_UPDATE_ENDPOINT, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Session-Id': SESSION_ID
             },
             body: JSON.stringify(payload)
         });
@@ -1314,8 +1329,27 @@ const sortTasksByStartDate = () => {
 // --- Event listeners & initial bootstrapping ---
 document.addEventListener('DOMContentLoaded', async () => {
     // Load persisted state
-    loadProjectFromStorage();
-    loadTasksFromStorage();
+    let bootstrapped = false;
+    try {
+        if (typeof window !== 'undefined' && window.__INITIAL_DATA__) {
+            const initial = window.__INITIAL_DATA__;
+            if (initial && typeof initial === 'object') {
+                // Accept either exact shape {tasks, project} or full payload
+                if (Array.isArray(initial.tasks) && initial.project) {
+                    tasks = initial.tasks.map(t => { const c = Object.assign({}, t); normalizeTask(c); return c; });
+                    currentProject = Object.assign({}, initial.project);
+                    saveTasksToStorage();
+                    saveProjectToStorage();
+                    bootstrapped = true;
+                }
+            }
+        }
+    } catch (e) { /* ignore */ }
+
+    if (!bootstrapped) {
+        loadProjectFromStorage();
+        loadTasksFromStorage();
+    }
 
     // Optional remote sync on load (if you enable REMOTE_SYNC_ON_LOAD)
     await tryFetchRemoteTasksOnLoad();
