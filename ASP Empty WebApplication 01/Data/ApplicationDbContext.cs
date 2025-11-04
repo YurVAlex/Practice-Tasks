@@ -50,7 +50,7 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasDefaultValue("{}");
 
-            entity.Property(e => e.Pages)
+            entity.Property(e => e.Projects)
                 .IsRequired()
                 .HasDefaultValue("{}");
 

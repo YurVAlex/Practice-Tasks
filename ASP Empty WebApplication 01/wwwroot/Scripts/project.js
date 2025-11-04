@@ -420,8 +420,8 @@ const updateProjectModalState = (mode) => {
         modalName.readOnly = false;
         modalName.classList.remove('bg-gray-100');
     } else if (mode === 'new') {
-        dateFields.classList.add('hidden');
-        descriptionField.classList.add('hidden');
+        dateFields.classList.remove('hidden');
+        descriptionField.classList.remove('hidden');
         okButton.textContent = 'Create Project';
         modalName.readOnly = false;
         modalName.value = '';

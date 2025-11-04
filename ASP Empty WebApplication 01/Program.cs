@@ -27,7 +27,6 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var dbContext = services.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.Migrate();
 }
 app.UseCors(policy => policy
     .AllowAnyOrigin()
@@ -65,7 +64,7 @@ app.MapPost("/register", async (User newUser, ApplicationDbContext dbContext) =>
 
         // Ensure default JSON fields are set if the client didn't provide them (User model handles required properties)
         if (newUser.Settings == null) newUser.Settings = "{}";
-        if (newUser.Pages == null) newUser.Pages = "{}";
+        if (newUser.Projects == null) newUser.Projects = "{}";
         if (newUser.Links == null) newUser.Links = "{}";
 
         // 3. Save to database
@@ -231,7 +230,7 @@ app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbCon
         return Results.Unauthorized();
     }
 
-    // Persist the received Project payload as a JSON string in the Pages field
+    // Persist the received Project payload as a JSON string in the Projects field
     string payloadJson;
     try
     {
@@ -247,7 +246,7 @@ app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbCon
         return Results.Problem("Failed to serialize project payload.");
     }
 
-    user.Pages = payloadJson;
+    user.Projects = payloadJson;
     await dbContext.SaveChangesAsync();
 
     // Return a simple acknowledgement including which user was updated
@@ -276,9 +275,9 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
     {
         userId = session.UserID;
         var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
-        if (user != null && !string.IsNullOrWhiteSpace(user.Pages) && user.Pages.Trim() != "{}")
+        if (user != null && !string.IsNullOrWhiteSpace(user.Projects) && user.Projects.Trim() != "{}")
         {
-            bootstrap = JsonSerializer.Deserialize<JsonElement>(user.Pages);
+            bootstrap = JsonSerializer.Deserialize<JsonElement>(user.Projects);
         }
         else
         {

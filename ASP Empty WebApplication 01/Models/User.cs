@@ -55,10 +55,10 @@ public class User
     public string Settings { get; set; } = "{}";
 
     /// <summary>
-    /// Key-value set representing user-specific page configurations, stored as a JSON string.
+    /// User's projects stored as a JSON string (Project model serialized to JSON).
     /// </summary>
     [Required]
-    public string Pages { get; set; } = "{}";
+    public string Projects { get; set; } = "{}";
 
     /// <summary>
     /// Key-value set representing external or internal links, stored as a JSON string.
