@@ -206,15 +206,12 @@ app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbCon
     Console.WriteLine(ProjectLogger.GenerateLogString(payload));
 
     // Identify the user by session id provided either as query string or header
-    var sessionIdStr = req.Query["sessionId"].ToString();
-    if (string.IsNullOrWhiteSpace(sessionIdStr))
-    {
-        sessionIdStr = req.Headers["X-Session-Id"].ToString();
-    }
+    
+      var sessionIdStr = req.Headers["X-Session-Id"].ToString();
 
     if (!Guid.TryParse(sessionIdStr, out var sessionId))
     {
-        return Results.BadRequest(new { success = false, error = "Missing or invalid session identifier. Provide '?sessionId=...' or 'X-Session-Id' header." });
+        return Results.BadRequest(new { success = false, error = "Missing or invalid session identifier. Provide 'X-Session-Id' header." });
     }
 
     var session = SessionManager.Sessions.FirstOrDefault(s => s.Id == sessionId);

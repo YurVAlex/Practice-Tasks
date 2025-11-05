@@ -1,6 +1,13 @@
-﻿namespace ProjectManager.Models;
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
+namespace ProjectManager.Models;
+
+/// <summary>
+/// DTO representing a collection of Project objects for serialization/deserialization.
+/// </summary>
 public class Projects
 {
-    public static List<Project> UserProjects = [];
+    [JsonPropertyName("userProjects")]
+    public List<Project> UserProjects { get; set; } = [];
 }

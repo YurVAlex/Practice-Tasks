@@ -1,0 +1,95 @@
+app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbContext) =>
+{
+    var options = new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true
+    };
+
+    Project? payload;
+    try
+    {
+        payload = await JsonSerializer.DeserializeAsync<Project>(req.Body, options);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error deserializing /projectUpdate payload: " + ex);
+        return Results.BadRequest(new { success = false, error = "Invalid JSON payload" });
+    }
+
+    if (payload == null)
+    {
+        Console.WriteLine("Received empty payload on /projectUpdate");
+        return Results.BadRequest(new { success = false, error = "Empty payload" });
+    }
+
+    // Ensure tasks are normalized (enforces invariants like progress/completed)
+    try
+    {
+        payload.NormalizeTasks();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Normalization error: " + ex);
+    }
+
+    // Show received summary on console
+    Console.WriteLine(ProjectLogger.GenerateLogString(payload));
+
+    // Identify the user by session id provided either as query string or header
+    
+      var sessionIdStr = req.Headers["X-Session-Id"].ToString();
+
+    if (!Guid.TryParse(sessionIdStr, out var sessionId))
+    {
+        return Results.BadRequest(new { success = false, error = "Missing or invalid session identifier. Provide 'X-Session-Id' header." });
+    }
+
+    var session = SessionManager.Sessions.FirstOrDefault(s => s.Id == sessionId);
+    if (session == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    // Find the user
+    var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
+    if (user == null)
+    {
+        return Results.Unauthorized();
+    }
+
+// Persist the received Project payload as a JSON string in the Projects field
+    string userProjectsJson;
+
+    var projects = ProjectsSerializer.DeserializeProjects(user.Projects);
+    if (projects == null)
+    {
+        Console.WriteLine("Error in user's projects deserializing");
+        return Results.Problem("Failed to deserialize user's projects on server.");
+    }
+    else 
+    {
+        projects.UserProjects.Add(payload);
+        try
+        {
+            userProjectsJson = ProjectsSerializer.SerializeProjects(projects);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error serializing Projects: " + ex);
+            return Results.Problem("Failed to serialize project payload.");
+        }
+    }
+
+    if (userProjectsJson != null)
+    {
+        user.Projects = userProjectsJson;
+        await dbContext.SaveChangesAsync();
+        // Return a simple acknowledgement including which user was updated
+        return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count, savedFor = user.Email });
+    }
+    else
+    {
+        return Results.Problem("User's projects list are not updated.");
+    }
+});
