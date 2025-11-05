@@ -11,3 +11,6 @@ x86/
 bld/
 [Bb]in/
 [Oo]bj/
+/ASP Empty WebApplication 01/users.db
+/ASP Empty WebApplication 01/users.db-shm
+/ASP Empty WebApplication 01/users.db-wal

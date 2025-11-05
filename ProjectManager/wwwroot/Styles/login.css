@@ -1,0 +1,189 @@
+﻿/* Page layout */
+body {
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+/* Centered form container with fixed width so toast doesn't affect it */
+.form-container {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: bold;
+    color: #555;
+}
+
+input[type="text"], input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    box-sizing: border-box;
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76,175,80,0.08);
+}
+
+/* Keep browser validation unobtrusive - don't override required behaviour */
+input:invalid {
+    border-color: #f44336;
+}
+
+input:valid {
+    border-color: #4CAF50;
+}
+
+.error-message {
+    color: #f44336;
+    font-size: 13px;
+    margin-top: 6px;
+    display: none;
+}
+
+.success-message {
+    color: #4CAF50;
+    font-size: 13px;
+    margin-top: 6px;
+    display: none;
+}
+
+.password-requirements {
+    color: #888;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+.visible {
+    display: block !important;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Buttons */
+.buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+
+.form-toggle {
+    text-align: center;
+    margin-top: 16px;
+}
+
+button {
+    background-color: #4CAF50; /* Primary Green */
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 15px;
+    margin-right: 10px;
+    transition: background-color 0.18s;
+}
+
+    button:hover {
+        background-color: #45a049;
+    }
+
+    button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+
+/* -------------------------
+   Toast / Status container
+   Moved to a distinct area outside form to avoid layout conflicts
+   ------------------------- */
+
+/* Hidden state for the toast container */
+.status-hidden {
+    display: none;
+}
+
+/* Toast container (fixed, not a full-screen backdrop) */
+#statusToast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    min-width: 260px;
+    max-width: calc(100% - 40px);
+    z-index: 1200;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.16);
+    font-weight: 600;
+    text-align: left;
+    overflow-wrap: break-word;
+    animation: toastIn 240ms ease-out;
+}
+
+    /* Success and error color variants */
+    #statusToast.status-success {
+        background-color: #e9f7ef; /* very light green */
+        color: #1e7e34;
+        border: 1px solid #28a745;
+    }
+
+    #statusToast.status-error {
+        background-color: #fff0f0; /* very light red */
+        color: #a4202c;
+        border: 1px solid #dc3545;
+    }
+
+.status-text {
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Entrance animation */
+@keyframes toastIn {
+    from {
+        transform: translateY(-8px) scale(0.995);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Responsive tweak to prevent overlap with small screens */
+@media (max-width: 480px) {
+    #statusToast {
+        left: 12px;
+        right: 12px;
+        top: 12px;
+    }
+}

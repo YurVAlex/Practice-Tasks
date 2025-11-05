@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/project.css">
+    <style>
+        /* Custom styles for the table and container */
+        .table-container {
+            overflow-x: auto;
+            max-height: 55vh; /* Limit height for scrollability */
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background-color: #f9fafb;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+            .user-table th, .user-table td {
+                padding: 0.75rem;
+                text-align: left;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            .user-table th {
+                background-color: #eef2ff; /* Light indigo header background */
+                color: #374151;
+                font-weight: 600;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            .user-table tr:hover {
+                background-color: #f3f4f6;
+            }
+    </style>
+</head>
+<body>
+
+    <!-- Current state panel -->
+    <div class="text-2xl font-extrabold text-gray-800 mb-2">
+        <span id="project-name-display" class="text-gray-800">Admin Console</span>
+    </div>
+
+    <div class="w-full mt-2 p-3 md:p-1 bg-white rounded-xl shadow-2xl">
+
+        <!-- Control panel -->
+        <div class="flex items-center gap-2 mb-10 p-1 bg-gray-50 rounded-lg flex-wrap ">
+
+            <button id="show-users" onclick="showRegistrations()" class="px-3 py-2 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                </svg>
+                View Users
+            </button>
+
+            <!-- Flexible spacer pushes the Project button to the far right -->
+            <div class="flex-1"></div>
+
+            <button id="open-languages-modal" class="px-2 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150 flex items-center gap-1"
+                    onclick="showToast('This feature is still under development.', 'error');">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.215L17.5 13m0 0l2.5-1.5m-2.5 1.5l2.5 1.5m-5.048-9.215A11.95 11.95 0 0110 21.75c-1.282-0.578-2.548-1.246-3.714-1.996M12 10a10 10 0 0110 0M2 10a10 10 0 0110 0" />
+                </svg>
+            </button>
+
+            <button id="dark-mode" class="px-2 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150 flex items-center gap-1"
+                    onclick="showToast('This feature is still under development.', 'error');">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Main info panel (Output container) -->
+        <div id="main-info-container" class="relative w-full min-h-[60vh] my-2 p-4 bg-gray-50 rounded-xl">
+            <p class="text-gray-500">Click the "View Users" button to fetch and display the registered users.</p>
+        </div>
+    </div>
+
+    <!-- Auxiliary info panel-->
+    <div class="w-full mt-3 p-4 md:p-3 bg-white rounded-xl shadow-xl border-t-4 border-gray-400">
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Auxiliary Information</h3>
+        <p id="project-description-display" class="text-gray-600 italic">User data fetched from the `/api/users` endpoint will appear above.</p>
+    </div>
+
+    <script>
+        const REMOTE_USERS_DATA_ENDPOINT = 'http://localhost:5146/api/users'; // optional endpoint to GET tasks
+
+        // Placeholder toast function (since it was used in the original HTML)
+        function showToast(message, type) {
+            console.log(`Toast (${type}): ${message}`);
+            // In a real application, this would display a temporary notification box.
+        }
+
+        /**
+         * Fetches user data from the server and displays it in a responsive HTML table.
+         */
+        async function showRegistrations() {
+            const container = document.getElementById('main-info-container');
+            container.innerHTML = '<div class="text-center py-8 text-indigo-500">Loading users...</div>';
+
+            try {
+                // 1. Fetch data from the API
+                const response = await fetch(REMOTE_USERS_DATA_ENDPOINT);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const users = await response.json();
+
+                // 2. Clear container and check if data is empty
+                container.innerHTML = '';
+
+                if (users.length === 0) {
+                    container.innerHTML = '<p class="text-center py-8 text-gray-500">No registered users found.</p>';
+                    return;
+                }
+
+                // 3. Generate the table HTML structure
+                let tableHtml = `
+                        <div class="table-container shadow-lg">
+                            <table class="user-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                users.forEach(user => {
+                    // Extract the first 8 characters of the GUID for readability
+                    const shortId = user.id ? user.id.substring(0, 8) + '...' : 'N/A';
+
+                    tableHtml += `
+                            <tr>
+                                <td class="text-xs text-gray-500">${shortId}</td>
+                                <td class="font-medium text-gray-800">${user.name}</td>
+                                <td class="text-blue-600">${user.email}</td>
+                            </tr>
+                        `;
+                });
+
+                tableHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                // 4. Insert the generated table into the container
+                container.innerHTML = tableHtml;
+
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                container.innerHTML = `
+                        <div class="text-center py-8 text-red-500">
+                            <p class="font-bold">Error fetching users</p>
+                            <p class="text-sm">${error.message}. Please ensure the server is running and the endpoint is accessible.</p>
+                        </div>
+                    `;
+            }
+            showRegistrationsInWindow()
+        }
+
+        function showRegistrationsInWindow() {
+            window.open("http://localhost:5146/users", "_blank", "width=400,height=1200,left=1000,top=100");
+        }
+    </script>
+
+</body>
+</html>
