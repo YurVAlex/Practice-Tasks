@@ -188,25 +188,17 @@ async function loginUser() {
             body: JSON.stringify(loginData)
         });
 
-        if (response.ok) {
-            const userData = await response.json();
-            // store session id for subsequent authenticated calls
-            try {
-                if (userData && userData.sessionId) {
-                    localStorage.setItem('session_id_v1', String(userData.sessionId));
-                }
-            } catch (e) { }
-            displayStatus(`Login successful! Welcome, ${userData.name || 'User'}!`, 'success');
-            const sid = userData && userData.sessionId ? String(userData.sessionId) : '';
-            window.location.href = `/getProject${sid ? (`?sessionId=${encodeURIComponent(sid)}`) : ''}`;
-        } else {
+        // Server-side login error info
+        if (!response.redirected) {
             let errorText = 'Invalid credentials or server issue.';
             try {
                 const errorData = await response.json();
                 errorText = errorData.error || errorText;
             } catch (e) { }
+
             displayStatus(`Login failed: ${errorText}`, 'error');
         }
+
     } catch (error) {
         console.error('Error:', error);
         displayStatus('Login failed. The server may not be reachable.', 'error');

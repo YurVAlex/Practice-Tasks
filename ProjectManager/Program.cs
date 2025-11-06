@@ -7,7 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 
 // This file defines the complete ASP.NET Core Minimal API server for ProTimeline app.
-
+//-----------------------------------------------------------------------------------------
 // --- Application Setup ---
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +37,83 @@ app.UseHttpsRedirection();
 app.UseStaticFiles(); // Enable serving static files from wwwroot
 
 // --- API Endpoints ---
+//-----------------------------------------------------------------------------------------
+// Login endpoint: Accepts JSON in the body
+
+app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContext, HttpContext context) =>
+{
+    // 1. Model Binding and Validation (via LoginModel DTO)
+    var validationContext = new ValidationContext(loginData, serviceProvider: null, items: null);
+    var validationResults = new List<ValidationResult>();
+    bool isValid = Validator.TryValidateObject(loginData, validationContext, validationResults, true);
+
+    if (!isValid)
+    {
+        var errors = validationResults.Select(r => r.ErrorMessage).ToList();
+        Console.WriteLine($"Login validation failed: {string.Join(", ", errors)}");
+        return Results.BadRequest(new { error = "Invalid data format.", details = errors });
+    }
+
+    try
+    {
+        // 2. Database Lookup
+        var user = await dbContext.Users
+            .FirstOrDefaultAsync(u => u.Email == loginData.Email && u.Password == loginData.Password);
+
+        if (user == null)
+        {
+            // 3. Login Failed
+            Console.WriteLine($"Login failed for email: {loginData.Email} (Invalid credentials)");
+            return Results.BadRequest(new { error = "Invalid e-mail or password." });
+        }
+
+        // 4. Login Successful
+        Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}");
+
+        // 3. Manage session and return it to the client
+
+        var session = SessionManager.GetSession(user.ID);
+        if (session == null)
+        {
+            // Session is absent in session's list 
+
+            session = SessionManager.ReturnNewSession(user.ID);
+
+            Console.WriteLine($"New session appointed: {session.Id} for {user.Email}");
+        }
+
+        var cookieOptions = new CookieOptions
+        {
+            // HttpOnly: TRUE means JavaScript CANNOT read this cookie.
+            // This is the correct setting if the Session ID is only for the server.
+            HttpOnly = true,
+
+            // Secure: TRUE means the cookie is only sent over HTTPS. 
+            // This is MANDATORY for production security.
+            Secure = true,
+
+            // SameSite: Use 'None' if your front-end and back-end are on different domains/ports.
+            // Note: SameSite=None REQUIRES Secure=true.
+            SameSite = SameSiteMode.None,
+
+            Expires = DateTimeOffset.UtcNow.AddDays(7),
+            Domain = null // Set to your domain if needed, null defaults to current host
+        };
+
+        // 3. SET THE COOKIE
+        context.Response.Cookies.Append("session_id_v1", session.Id, cookieOptions);
+
+        var redirectUrl = "http://localhost:5146/getProject";
+        return Results.Redirect(redirectUrl, permanent: false);
+
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error during login: {ex.Message}");
+        return Results.Problem("An internal server error occurred during login.");
+    }
+});
+
 
 // Registration endpoint: Accepts JSON in the body
 app.MapPost("/register", async (User newUser, ApplicationDbContext dbContext) =>
@@ -74,8 +151,7 @@ app.MapPost("/register", async (User newUser, ApplicationDbContext dbContext) =>
         Console.WriteLine($"New user registered: {newUser.Name} ({newUser.Email}) - ID: {newUser.ID}");
 
         // Create a session for this new user
-        var session = new Session(newUser.ID);
-        SessionManager.Sessions.Add(session);
+        var session = SessionManager.ReturnNewSession(newUser.ID);
 
         // Return the created user and session id
         return Results.Json(new
@@ -94,56 +170,6 @@ app.MapPost("/register", async (User newUser, ApplicationDbContext dbContext) =>
     }
 });
 
-// Login endpoint: Accepts JSON in the body
-app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContext) =>
-{
-    // 1. Model Binding and Validation (via LoginModel DTO)
-    var validationContext = new ValidationContext(loginData, serviceProvider: null, items: null);
-    var validationResults = new List<ValidationResult>();
-    bool isValid = Validator.TryValidateObject(loginData, validationContext, validationResults, true);
-
-    if (!isValid)
-    {
-        var errors = validationResults.Select(r => r.ErrorMessage).ToList();
-        Console.WriteLine($"Login validation failed: {string.Join(", ", errors)}");
-        return Results.BadRequest(new { error = "Invalid data format.", details = errors });
-    }
-
-    try
-    {
-        // 2. Database Lookup
-        var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Email == loginData.Email && u.Password == loginData.Password);
-
-        if (user == null)
-        {
-            // 3. Login Failed
-            Console.WriteLine($"Login failed for email: {loginData.Email} (Invalid credentials)");
-            return Results.BadRequest(new { error = "Invalid e-mail or password." });
-        }
-
-        // 4. Login Successful
-        Console.WriteLine($"User successfully logged in: {user.Email} - ID: {user.ID}");
-
-        // Create a new session and return it to the client
-        var session = new Session(user.ID);
-        SessionManager.Sessions.Add(session);
-
-        return Results.Json(new
-        {
-            id = user.ID,
-            name = user.Name,
-            email = user.Email,
-            sessionId = session.Id,
-            message = "Login successful!"
-        });
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error during login: {ex.Message}");
-        return Results.Problem("An internal server error occurred during login.");
-    }
-});
 
 
 // Users endpoint - display registered users in HTML
@@ -206,15 +232,10 @@ app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbCon
     Console.WriteLine(ProjectLogger.GenerateLogString(payload));
 
     // Identify the user by session id provided either as query string or header
-    
-      var sessionIdStr = req.Headers["X-Session-Id"].ToString();
 
-    if (!Guid.TryParse(sessionIdStr, out var sessionId))
-    {
-        return Results.BadRequest(new { success = false, error = "Missing or invalid session identifier. Provide 'X-Session-Id' header." });
-    }
+    var sessionId = req.Headers["X-Session-Id"].ToString();
 
-    var session = SessionManager.Sessions.FirstOrDefault(s => s.Id == sessionId);
+    var session = SessionManager.GetSession(sessionId);
     if (session == null)
     {
         return Results.Unauthorized();
@@ -252,25 +273,17 @@ app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbCon
 
 app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbContext) =>
 {
-    var sessionIdStr = context.Request.Query["sessionId"].ToString();
-    if (string.IsNullOrWhiteSpace(sessionIdStr))
+    if (context.Request.Cookies.TryGetValue("session_id_v1", out string? sessionId))
     {
-        sessionIdStr = context.Request.Headers["X-Session-Id"].ToString();
-    }
+        var session = SessionManager.GetSession(sessionId);
+        if (session == null)
+        {
+            context.Response.StatusCode = 401;
+        }
 
-    Guid.TryParse(sessionIdStr, out var sessionId);
-    var session = SessionManager.Sessions.FirstOrDefault(s => s.Id == sessionId);
+        // Resolve user's stored project data (if any)
+        object bootstrap;
 
-    // Load base HTML
-    var path = Path.Combine(builder.Environment.WebRootPath, "TaskManager.html");
-    var html = await File.ReadAllTextAsync(path);
-
-    // Resolve user's stored project data (if any)
-    object bootstrap;
-    Guid? userId = null;
-    if (session != null)
-    {
-        userId = session.UserID;
         var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
         if (user != null && !string.IsNullOrWhiteSpace(user.Projects) && user.Projects.Trim() != "{}")
         {
@@ -285,33 +298,30 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
                 clientTimestamp = DateTimeOffset.UtcNow
             };
         }
-    }
-    else
-    {
-        bootstrap = new
+
+        // Load base HTML
+        var path = Path.Combine(builder.Environment.WebRootPath, "TaskManager.html");
+        var html = await File.ReadAllTextAsync(path);
+
+        // Injection script for initial data and session id
+        var injection = "<script>window.__INITIAL_DATA__ = " + JsonSerializer.Serialize(bootstrap) + "; window.__SESSION_ID__ = '" + (session?.Id.ToString() ?? "") + "';</script>";
+
+        // Insert before closing body tag
+        var idx = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0)
         {
-            tasks = Array.Empty<object>(),
-            project = new { name = "New Project", startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
-            clientTimestamp = DateTimeOffset.UtcNow
-        };
+            html = html.Insert(idx, injection);
+        }
+        else
+        {
+            html += injection;
+        }
+
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(html);
     }
 
-    // Injection script for initial data and session id
-    var injection = "<script>window.__INITIAL_DATA__ = " + JsonSerializer.Serialize(bootstrap) + "; window.__SESSION_ID__ = '" + (session?.Id.ToString() ?? "") + "';</script>";
-
-    // Insert before closing body tag
-    var idx = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
-    if (idx >= 0)
-    {
-        html = html.Insert(idx, injection);
-    }
-    else
-    {
-        html += injection;
-    }
-
-    context.Response.ContentType = "text/html; charset=utf-8";
-    await context.Response.WriteAsync(html);
+    context.Response.StatusCode = 401;
 });
 
 // Default route to serve the main HTML file
