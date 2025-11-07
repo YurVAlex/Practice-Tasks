@@ -185,11 +185,19 @@ async function loginUser() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(loginData)
+            body: JSON.stringify(loginData),
+            credentials: 'include' // <--- THIS IS CRITICAL FOR SENDING COOKIES
         });
 
         // Server-side login error info
-        if (!response.redirected) {
+        if (response.ok) {
+
+            const okData = await response.json();
+            displayStatus(okData.success, 'success');
+            window.location.href = `${baseUrl}/getProject`;
+            
+        }
+        else {
             let errorText = 'Invalid credentials or server issue.';
             try {
                 const errorData = await response.json();
@@ -198,6 +206,7 @@ async function loginUser() {
 
             displayStatus(`Login failed: ${errorText}`, 'error');
         }
+
 
     } catch (error) {
         console.error('Error:', error);

@@ -52,13 +52,14 @@ app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContex
         var errors = validationResults.Select(r => r.ErrorMessage).ToList();
         Console.WriteLine($"Login validation failed: {string.Join(", ", errors)}");
         return Results.BadRequest(new { error = "Invalid data format.", details = errors });
-    }
+    } // TODO Add new class Validation (use overloaded Validation.TryValidate(loginData))
 
     try
     {
         // 2. Database Lookup
         var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.Email == loginData.Email && u.Password == loginData.Password);
+        // TODO Add new class DataProcessor (use await overloaded DataProcessor.GetUser(loginData))
 
         if (user == null)
         {
@@ -80,7 +81,7 @@ app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContex
             session = SessionManager.ReturnNewSession(user.ID);
 
             Console.WriteLine($"New session appointed: {session.Id} for {user.Email}");
-        }
+        }  // TODO new method to SessionManager (SessionManager.GetSessionFromCacheOrMakeNew(user.ID))
 
         var cookieOptions = new CookieOptions
         {
@@ -98,13 +99,12 @@ app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContex
 
             Expires = DateTimeOffset.UtcNow.AddDays(7),
             Domain = null // Set to your domain if needed, null defaults to current host
-        };
+        };  // TODO new class CookieManager (CookieManager.SessionCookieOptions)
 
         // 3. SET THE COOKIE
         context.Response.Cookies.Append("session_id_v1", session.Id, cookieOptions);
 
-        var redirectUrl = "http://localhost:5146/getProject";
-        return Results.Redirect(redirectUrl, permanent: false);
+        return Results.Ok(new { success = $"User {user.Name} logged in." });
 
     }
     catch (Exception ex)
@@ -192,7 +192,6 @@ app.MapGet("/api/users", async (ApplicationDbContext dbContext) =>
     }));
 });
 
-// projectUpdate and default route remain unchanged
 app.MapPost("/projectUpdate", async (HttpRequest req, ApplicationDbContext dbContext) =>
 {
     var options = new JsonSerializerOptions
@@ -304,7 +303,7 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
         var html = await File.ReadAllTextAsync(path);
 
         // Injection script for initial data and session id
-        var injection = "<script>window.__INITIAL_DATA__ = " + JsonSerializer.Serialize(bootstrap) + "; window.__SESSION_ID__ = '" + (session?.Id.ToString() ?? "") + "';</script>";
+        var injection = "<script>window.__INITIAL_DATA__ = " + JsonSerializer.Serialize(bootstrap) + ";</script>";
 
         // Insert before closing body tag
         var idx = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
@@ -317,11 +316,17 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
             html += injection;
         }
 
+        Console.WriteLine($"Sending project to {user?.Name}");
+
         context.Response.ContentType = "text/html; charset=utf-8";
+        // IMPORTANT: Ensure the Content-Disposition header is NOT set to 'attachment'
+
         await context.Response.WriteAsync(html);
     }
-
-    context.Response.StatusCode = 401;
+    else
+    {
+        context.Response.StatusCode = 401;
+    }
 });
 
 // Default route to serve the main HTML file
