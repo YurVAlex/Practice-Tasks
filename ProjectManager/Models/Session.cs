@@ -7,11 +7,16 @@ public class Session
 
     public Guid UserID { get; init; }
 
-    public Session(Guid userID)
+    // TODO Add new field Project CurrentProject
+
+    public Session(Guid userID ) // TODO add Project currentProject parameter = null by default
     {
         this.UserID = userID;
 
         Id = GenerateSecureSessionId();
+
+        // TODO attach currentProject or null
+
     }
 
     static string GenerateSecureSessionId()

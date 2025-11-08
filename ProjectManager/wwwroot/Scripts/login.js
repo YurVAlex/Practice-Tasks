@@ -3,7 +3,7 @@ let isRegistrationMode = false;
 const baseUrl = 'http://localhost:5146'; // Base URL for the API
 
 // Keep a timer handle on window so other modules can clear it if needed
-window.statusTimer = window.statusTimer || null;
+window.statusTimer = window.statusTimer || null; // ???
 
 /**
  * Displays a success or error message in the dedicated status toast.

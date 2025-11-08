@@ -12,12 +12,12 @@
 
 // Optional: toggle remote fetch-on-load behavior (if your backend exposes a tasks endpoint).
 // If you want to try server-side syncing on load, set to true and supply a matching endpoint.
-const REMOTE_SYNC_ON_LOAD = false;
+// const REMOTE_SYNC_ON_LOAD = true;
 const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
 const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendProjectUpdate();
 
 // Session support: read from server injection or fallback to localStorage
-const SESSION_STORAGE_KEY = 'session_id_v1';
+/*const SESSION_STORAGE_KEY = 'session_id_v1';
 let SESSION_ID = '';
 try {
     if (typeof window !== 'undefined' && window.__SESSION_ID__ && String(window.__SESSION_ID__).length > 0) {
@@ -28,7 +28,7 @@ try {
     }
 } catch (e) {
     // ignore storage errors
-}
+}*/
 
 
 // --- Storage keys (version these if you change the shape later) ---
@@ -191,17 +191,17 @@ async function sendProjectUpdate() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Session-Id': SESSION_ID
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            credentials: 'include' // <--- THIS IS CRITICAL FOR SENDING COOKIES
         });
 
         if (!response.ok) {
             // non-2xx responses are still considered "successful fetch" but report them
             console.warn(`projectUpdate returned status ${response.status}`);
         }
-
         return response;
+
     } catch (error) {
         // Network / fetch error — keep local storage authoritative but surface the problem to console
         console.error('Failed to send projectUpdate payload:', error);
@@ -211,12 +211,12 @@ async function sendProjectUpdate() {
 }
 
 // Optionally fetch remote tasks and merge onto local storage (not enabled by default)
-async function tryFetchRemoteTasksOnLoad() {
+/*async function tryFetchRemoteTasksOnLoad() {
     if (!REMOTE_SYNC_ON_LOAD) return;
     try {
-        const res = await fetch(REMOTE_TASKS_ENDPOINT);
-        if (!res.ok) return;
-        const remoteTasks = await res.json();
+        const response = await fetch(REMOTE_TASKS_ENDPOINT);
+        if (!response.ok) return;
+        const remoteTasks = await response.json();
         if (Array.isArray(remoteTasks)) {
             // Very simple merge: prefer remote tasks (could be changed to two-way merge)
             tasks = remoteTasks.map(t => {
@@ -230,8 +230,8 @@ async function tryFetchRemoteTasksOnLoad() {
         console.warn('Remote tasks fetch failed:', e);
     }
 }
-
-// --- Helper date functions (unchanged) ---
+*/
+// --- Helper date functions ---
 const getDayDifference = (date1, date2) => {
     const oneDay = 1000 * 60 * 60 * 24;
     const diffTime = date2.getTime() - date1.getTime();
@@ -245,7 +245,7 @@ const dateToISOString = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// --- Toast UI helper (unchanged) ---
+// --- Toast UI helper ---
 const showToast = (message, type = 'info', duration = 4000) => {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
@@ -279,7 +279,7 @@ const showToast = (message, type = 'info', duration = 4000) => {
     }, duration);
 };
 
-// --- Timeline update logic (slightly modified to persist project changes) ---
+// --- Timeline update logic ---
 let timelineStartDate = new Date('2025-10-05T00:00:00');
 let timelineEndDate = new Date('2025-12-16T00:00:00');
 let timelineTotalDays = 0;
@@ -1352,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Optional remote sync on load (if you enable REMOTE_SYNC_ON_LOAD)
-    await tryFetchRemoteTasksOnLoad();
+    //await tryFetchRemoteTasksOnLoad();
 
     renderProjectInfo();
     renderTimeline(currentProject.startDate, currentProject.endDate);

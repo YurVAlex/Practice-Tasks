@@ -7,12 +7,12 @@ public static class SessionManager
 {
     public static List<Session> Sessions = [];
 
-    public static void AddNewSession(Guid userId)
+    public static void AddNewSession(Guid userId) // TODO add parameter currentProject = null by default
     {
         Sessions.Add(new Session(userId));
     }
 
-    public static Session ReturnNewSession(Guid userId)
+    public static Session ReturnNewSession(Guid userId) // TODO add parameter currentProject = null by default
     {
         var newSession = new Session(userId);
         Sessions.Add(newSession);
