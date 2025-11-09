@@ -307,14 +307,6 @@ app.MapPost("/projectUpdate", async (HttpContext context, ApplicationDbContext d
             // TODO Add new class DataProcessor (use await overloaded DataProcessor.GetUser(UserID))
             // TODO Make further operations with currentProject in accord Session of sessionManager list
             // TODO Add asunc function to DataProcessor class which should update database using sessionManager currentProjects clientTimestamps 
-            var currentProject = session.projectsProcessor.GetProjectByName(payload.ProjectInfo.Name);
-            if (currentProject == null)
-            {
-                Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                Console.WriteLine($"Can't find project {payload.ProjectInfo.Name} in user session cache.");
-                Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                return Results.BadRequest($"Can't find project {payload.ProjectInfo.Name} in user session cache.");
-            }
 
             if(session.projectsProcessor.ReplaceProject(payload))
             {

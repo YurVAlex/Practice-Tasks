@@ -17,25 +17,30 @@ namespace ProjectManager.Models;
 /// </summary>
 public class Project
 {
+
+
+
     [JsonPropertyName("tasks")]
     public List<TaskItem> Tasks { get; set; } = new List<TaskItem>();
+
 
     // JSON key "project" maps here
     [JsonPropertyName("project")]
     public ProjectInfo ProjectInfo { get; set; } = new ProjectInfo();
 
+
     // Optional - the single task the client recently changed (may be null)
     [JsonPropertyName("lastUpdatedTask")]
     public TaskItem? LastUpdatedTask { get; set; }
+
 
     // ISO 8601 timestamp from client; nullable if client didn't send it
     [JsonPropertyName("clientTimestamp")]
     public DateTimeOffset? ClientTimestamp { get; set; }
 
-    /// <summary>
+
+   
     /// Normalize all contained tasks (useful to call before processing/saving)
-    /// </summary>
-    /// 
     public void NormalizeTasks()
     {
         if (Tasks == null) return;
