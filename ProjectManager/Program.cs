@@ -5,6 +5,7 @@ using ProjectManager.Utilites;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using ProjectManager.Utilities;
 
 // This file defines the complete ASP.NET Core Minimal API server for ProTimeline app.
 //-----------------------------------------------------------------------------------------
@@ -90,7 +91,7 @@ app.MapPost("/login", async (LoginModel loginData, ApplicationDbContext dbContex
         {
             // Session is absent in session's list 
 
-            session = SessionManager.ReturnNewSession(user.ID);
+            session = SessionManager.ReturnNewSession(user);
 
             Console.WriteLine("=========================================================");
             Console.WriteLine($"New session appointed: {session.Id} for {user.Email}");
@@ -165,7 +166,7 @@ app.MapPost("/register", async (User userData, ApplicationDbContext dbContext, H
         Console.WriteLine($"New user registered: {userData.Name} ({userData.Email}) - ID: {userData.ID}");
 
         // Create a session for this new user
-        var session = SessionManager.ReturnNewSession(userData.ID);
+        var session = SessionManager.ReturnNewSession(userData);
 
         var cookieOptions = new CookieOptions
         {
@@ -209,37 +210,17 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
         else
         {
             // Resolve user's stored project data (if any)
-            object bootstrap;
-
-            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
-            // TODO Add new class DataProcessor (use await overloaded DataProcessor.GetUser(session.UserID))
-            // TODO Add new field to SessionManager (use sessionManager.CurrentProject)
-
-            if (user != null && !string.IsNullOrWhiteSpace(user.Projects) && user.Projects.Trim() != "{}")
-            {
-                bootstrap = JsonSerializer.Deserialize<JsonElement>(user.Projects); 
-                // TODO session.CurrentProject 
-                // TODO Use ProjectSerializer.DeserializeProjects(string jsonString)
-                
-            }
-            else
-            {
-                bootstrap = new
-                {
-                    tasks = Array.Empty<object>(),
-                    project = new { name = "New Project", startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd"), endDate = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), description = "" },
-                    clientTimestamp = DateTimeOffset.UtcNow
-                    // TODO Add new method to GeneratorHtml class to return this object
-                };
-            }
-
+            var bootstrap = session.projectsProcessor.GetLatestProjectOrDefault();
+            
             // Load base HTML
             // TODO Add new method to GeneratorHtml class to return this html
             var path = Path.Combine(builder.Environment.WebRootPath, "TaskManager.html");
             var html = await File.ReadAllTextAsync(path);
 
             // Injection script for initial data and session id
-            var injection = "<script>window.__INITIAL_DATA__ = " + JsonSerializer.Serialize(bootstrap) + ";</script>";
+            var injection = "<script>window.__INITIAL_DATA__ = " + 
+                            ProjectsSerializer.SerializeProject(bootstrap) + 
+                            ";</script>";
             // TODO Use ProjectSerializer 
             // TODO Add new method to GeneratorHtml class to return this string
 
@@ -256,7 +237,7 @@ app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbCon
             // TODO Add new method to GeneratorHtml class to return this html
 
             Console.WriteLine("================================================================================");
-            Console.WriteLine($"Sending project to {user?.Name}");
+            Console.WriteLine($"Sending project {bootstrap.ProjectInfo.Name}");
             Console.WriteLine($"Session Id: {sessionId}");
             Console.WriteLine("================================================================================");
 
@@ -326,41 +307,49 @@ app.MapPost("/projectUpdate", async (HttpContext context, ApplicationDbContext d
             // TODO Add new class DataProcessor (use await overloaded DataProcessor.GetUser(UserID))
             // TODO Make further operations with currentProject in accord Session of sessionManager list
             // TODO Add asunc function to DataProcessor class which should update database using sessionManager currentProjects clientTimestamps 
-            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
-            if (user == null)
+            var currentProject = session.projectsProcessor.GetProjectByName(payload.ProjectInfo.Name);
+            if (currentProject == null)
             {
-                return Results.Unauthorized();
+                Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                Console.WriteLine($"Can't find project {payload.ProjectInfo.Name} in user session cache.");
+                Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                return Results.BadRequest($"Can't find project {payload.ProjectInfo.Name} in user session cache.");
             }
 
-
-            // TODO Add payload as Project to projects list in User's Projects property
-            // TODO Serialize Projects using ProjectsSerializer to persist as a JSON string in the db Projects field
-            // TODO Add payload as currentProject in User's Session and sessions list in SessionManager
-
-
-            // Persist the received Project payload as a JSON string in the Projects field
-            string payloadJson;
-            try
+            if(session.projectsProcessor.ReplaceProject(payload))
             {
-                payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                // Persist the received Project payload as a JSON string in the Projects field
+                string projectsJson;
+                try
                 {
-                    PropertyNamingPolicy = null,
-                    WriteIndented = false
-                });
+                    projectsJson = ProjectsSerializer.SerializeProjects(session.projectsProcessor.Projects);
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error serializing Projects from session cache: " + ex);
+                    return Results.Problem("Failed to serialize Projects from session cache.");
+                }
+
+                // Database Lookup - TODO Delete that add scheduled database update in DataProcessor class)
+                var user = await dbContext.Users
+                    .FirstOrDefaultAsync(u => u.ID == session.UserID);
+                user.Projects = projectsJson;
+                await dbContext.SaveChangesAsync();
+
+                // TODO Delete that add scheduled database update in DataProcessor class)
+                // TODO Add session expirsoon check 
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine("Error serializing Project payload: " + ex);
-                return Results.Problem("Failed to serialize project payload.");
+                Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                Console.WriteLine($"Can't replace project {payload.ProjectInfo.Name} in user session cache.");
+                Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             }
+                // TODO Add payload as Project to projects list in User's Projects property
 
-            user.Projects = payloadJson;
-            await dbContext.SaveChangesAsync();
-
-            // TODO Add session expirsoon check 
-
-            // Return a simple acknowledgement including which user was updated
-            return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count, savedFor = user.Email });
+                // Return a simple acknowledgement including which user was updated
+                return Results.Ok(new { success = true, receivedTasks = payload.Tasks.Count, savedFor = payload.ProjectInfo.Name });
         }
     }
     else

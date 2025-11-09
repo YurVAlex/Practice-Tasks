@@ -1,4 +1,6 @@
 ﻿namespace ProjectManager.Models;
+
+using ProjectManager.Utilites;
 using System.Security.Cryptography;
 
 public class Session
@@ -7,16 +9,15 @@ public class Session
 
     public Guid UserID { get; init; }
 
-    // TODO Add new field Project CurrentProject
+    public ProjectsProcessor projectsProcessor { get; set; }
 
-    public Session(Guid userID ) // TODO add Project currentProject parameter = null by default
+    public Session(User user) 
     {
-        this.UserID = userID;
+        this.UserID = user.ID;
 
         Id = GenerateSecureSessionId();
 
-        // TODO attach currentProject or null
-
+        projectsProcessor = new ProjectsProcessor(user);
     }
 
     static string GenerateSecureSessionId()

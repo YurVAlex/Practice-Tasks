@@ -35,6 +35,7 @@ public class Project
     /// <summary>
     /// Normalize all contained tasks (useful to call before processing/saving)
     /// </summary>
+    /// 
     public void NormalizeTasks()
     {
         if (Tasks == null) return;
