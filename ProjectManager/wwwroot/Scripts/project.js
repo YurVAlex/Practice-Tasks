@@ -36,12 +36,31 @@ const STORAGE_KEY_TASKS = 'timeline_tasks_v1';
 const STORAGE_KEY_PROJECT = 'timeline_project_v1';
 
 // Default project and tasks (used when nothing in storage)
-const defaultProject = {
-    name: "Initial Project Timeline",
-    startDate: '2025-10-05',
-    endDate: '2025-12-16',
-    description: "This is the default, initial project description."
-};
+// Helper to generate a new GUID (simple version for client-side)
+function generateGuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Default project structure matching the server's Project model
+// Use a function to avoid eager GUID generation
+function getDefaultProject() {
+    return {
+        id: generateGuid(),
+        tasks: [],
+        project: {  // ProjectInfo nested object
+            name: "Initial Project Timeline",
+            startDate: '2025-10-05',
+            endDate: '2025-12-16',
+            description: "This is the default, initial project description."
+        },
+        lastUpdatedTask: null,
+        clientTimestamp: new Date().toISOString()
+    };
+}
 
 // Note: tasks include optional `progress` (number 0-100) and `completed` (boolean).
 const defaultTasks = [
@@ -160,13 +179,23 @@ function loadProjectFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY_PROJECT);
     if (raw) {
         try {
-            currentProject = JSON.parse(raw) || defaultProject;
+            currentProject = JSON.parse(raw);
+            if (!currentProject) {
+                currentProject = getDefaultProject();
+            }
+            // Ensure id exists (for backward compatibility with old data)
+            if (!currentProject.id) {
+                currentProject.id = generateGuid();
+                console.warn('[loadProjectFromStorage] Project missing id, generated:', currentProject.id);
+                saveProjectToStorage();
+            }
             return;
         } catch (e) {
             console.error('Failed to parse stored project, resetting to default.', e);
         }
     }
-    currentProject = Object.assign({}, defaultProject);
+    currentProject = getDefaultProject();
+    console.log('[loadProjectFromStorage] Created default project with id:', currentProject.id);
     saveProjectToStorage();
 }
 
@@ -181,10 +210,15 @@ function saveProjectToStorage() {
 async function sendProjectUpdate() {
 
     const payload = {
+        id: currentProject.id,
         tasks: tasks, 
-        project: currentProject,
+        project: currentProject.project,
+        lastUpdatedTask: currentProject.lastUpdatedTask,
         clientTimestamp: new Date().toISOString()
     };
+    
+    console.log('[sendProjectUpdate] Sending project with id:', payload.id);
+    console.log('[sendProjectUpdate] Project name:', payload.project?.name);
 
     try {
         const response = await fetch(REMOTE_UPDATE_ENDPOINT, {
@@ -292,11 +326,16 @@ let timelineTotalDays = 0;
 */
 const fitTimelineToTasks = (shrinkAllowed = true) => {
     if (!Array.isArray(tasks) || tasks.length === 0) {
-        // no tasks -> revert to defaults
-        currentProject = Object.assign({}, defaultProject);
+        // no tasks -> revert to defaults (preserve existing Id if possible)
+        const existingId = currentProject.id;
+        currentProject = getDefaultProject();
+        if (existingId) {
+            currentProject.id = existingId;  // Preserve the Id from server
+        }
         saveProjectToStorage();
         renderProjectInfo();
-        renderTimeline(currentProject.startDate, currentProject.endDate);
+        const projectInfo = currentProject.project || {};
+        renderTimeline(projectInfo.startDate, projectInfo.endDate);
         showToast('No tasks present — timeline reset to default project bounds.', 'info');
         return;
     }
@@ -313,11 +352,16 @@ const fitTimelineToTasks = (shrinkAllowed = true) => {
     });
 
     if (!minStart || !maxEnd) {
-        // fallback
-        currentProject = Object.assign({}, defaultProject);
+        // fallback (preserve existing Id if possible)
+        const existingId = currentProject.id;
+        currentProject = getDefaultProject();
+        if (existingId) {
+            currentProject.id = existingId;  // Preserve the Id from server
+        }
         saveProjectToStorage();
         renderProjectInfo();
-        renderTimeline(currentProject.startDate, currentProject.endDate);
+        const projectInfo = currentProject.project || {};
+        renderTimeline(projectInfo.startDate, projectInfo.endDate);
         showToast('Unable to calculate task bounds — timeline reset to defaults.', 'error');
         return;
     }
@@ -325,17 +369,20 @@ const fitTimelineToTasks = (shrinkAllowed = true) => {
     const newStartStr = dateToISOString(minStart);
     const newEndStr = dateToISOString(maxEnd);
 
-    const currentStartStr = currentProject.startDate;
-    const currentEndStr = currentProject.endDate;
+    const projectInfo = currentProject.project || {};
+    const currentStartStr = projectInfo.startDate;
+    const currentEndStr = projectInfo.endDate;
 
     if (shrinkAllowed) {
         // set to exact min/max
         if (newStartStr !== currentStartStr || newEndStr !== currentEndStr) {
-            currentProject.startDate = newStartStr;
-            currentProject.endDate = newEndStr;
+            if (!currentProject.project) currentProject.project = {};
+            currentProject.project.startDate = newStartStr;
+            currentProject.project.endDate = newEndStr;
+            currentProject.clientTimestamp = new Date().toISOString();
             saveProjectToStorage();
             renderProjectInfo();
-            renderTimeline(currentProject.startDate, currentProject.endDate);
+            renderTimeline(newStartStr, newEndStr);
             // renderTimeline calls renderTasks internally
             showToast(`Timeline adjusted to fit tasks (${newStartStr} to ${newEndStr}).`, 'info');
             return;
@@ -364,11 +411,13 @@ const fitTimelineToTasks = (shrinkAllowed = true) => {
         }
 
         if (changed) {
-            currentProject.startDate = updatedStart;
-            currentProject.endDate = updatedEnd;
+            if (!currentProject.project) currentProject.project = {};
+            currentProject.project.startDate = updatedStart;
+            currentProject.project.endDate = updatedEnd;
+            currentProject.clientTimestamp = new Date().toISOString();
             saveProjectToStorage();
             renderProjectInfo();
-            renderTimeline(currentProject.startDate, currentProject.endDate);
+            renderTimeline(updatedStart, updatedEnd);
             showToast(`Timeline expanded to include task bounds (${updatedStart} to ${updatedEnd}).`, 'success');
             return;
         } else {
@@ -393,10 +442,12 @@ const adjustTimelineAfterDeletion = () => {
 // --- Project modal behavior (saving project persists to storage) ---
 const openProjectModal = () => {
     const modal = document.getElementById('project-modal');
-    document.getElementById('project-modal-name').value = currentProject.name;
-    document.getElementById('project-modal-start-date').value = currentProject.startDate;
-    document.getElementById('project-modal-end-date').value = currentProject.endDate;
-    document.getElementById('project-modal-description').value = currentProject.description;
+    // Access nested ProjectInfo object
+    const projectInfo = currentProject.project || {};
+    document.getElementById('project-modal-name').value = projectInfo.name || '';
+    document.getElementById('project-modal-start-date').value = projectInfo.startDate || '';
+    document.getElementById('project-modal-end-date').value = projectInfo.endDate || '';
+    document.getElementById('project-modal-description').value = projectInfo.description || '';
     document.getElementById('project-modal-status').textContent = '';
     document.getElementById('project-mode-current').checked = true;
     updateProjectModalState('current');
@@ -463,17 +514,33 @@ const handleProjectModalOk = () => {
         return;
     }
 
+    // Preserve the existing id and update the nested ProjectInfo
+    const existingId = currentProject.id;
+    if (!existingId) {
+        console.error('[handleProjectModalOk] CRITICAL: currentProject.id is missing!');
+        console.error('[handleProjectModalOk] currentProject:', currentProject);
+    }
+    
     currentProject = {
-        name: projectName,
-        startDate: startDateStr,
-        endDate: endDateStr,
-        description: projectDescription
+        id: existingId || generateGuid(),  // Should never need to generate new
+        tasks: tasks,  // Include current tasks
+        project: {  // Update nested ProjectInfo object
+            name: projectName,
+            startDate: startDateStr,
+            endDate: endDateStr,
+            description: projectDescription
+        },
+        lastUpdatedTask: null,
+        clientTimestamp: new Date().toISOString()
     };
+    
+    console.log('[handleProjectModalOk] Updated project with id:', currentProject.id);
+    console.log('[handleProjectModalOk] Project name:', currentProject.project.name);
 
     saveProjectToStorage();
     closeProjectModal();
     renderProjectInfo();
-    renderTimeline(currentProject.startDate, currentProject.endDate);
+    renderTimeline(startDateStr, endDateStr);
     showToast(`Project boundaries successfully updated.`, 'info');
     sendProjectUpdate();
     
@@ -486,9 +553,10 @@ const openScaleModal = () => {
     const modal = document.getElementById('scale-modal');
     if (!modal) return;
 
-    // Populate fields from currentProject
-    document.getElementById('scale-modal-start-date').value = currentProject.startDate || '';
-    document.getElementById('scale-modal-end-date').value = currentProject.endDate || '';
+    // Populate fields from nested ProjectInfo
+    const projectInfo = currentProject.project || {};
+    document.getElementById('scale-modal-start-date').value = projectInfo.startDate || '';
+    document.getElementById('scale-modal-end-date').value = projectInfo.endDate || '';
     document.getElementById('scale-modal-status').textContent = '';
 
     modal.classList.remove('hidden');
@@ -531,12 +599,14 @@ const handleScaleModalOk = () => {
         return;
     }
 
-    // Update project bounds, persist, and re-render timeline
-    currentProject.startDate = startDateStr;
-    currentProject.endDate = endDateStr;
+    // Update project bounds in nested ProjectInfo, persist, and re-render timeline
+    if (!currentProject.project) currentProject.project = {};
+    currentProject.project.startDate = startDateStr;
+    currentProject.project.endDate = endDateStr;
+    currentProject.clientTimestamp = new Date().toISOString();
     saveProjectToStorage();
     renderProjectInfo();
-    renderTimeline(currentProject.startDate, currentProject.endDate);
+    renderTimeline(currentProject.project.startDate, currentProject.project.endDate);
 
     showToast('Timeline updated.', 'success');
     closeScaleModal();
@@ -937,8 +1007,10 @@ const handleContextMenuAction = (action) => {
 };
 
 const renderProjectInfo = () => {
-    document.getElementById('project-name-display').textContent = currentProject.name;
-    document.getElementById('project-description-display').textContent = currentProject.description || 'No description provided.';
+    // Access nested ProjectInfo object
+    const projectInfo = currentProject.project || {};
+    document.getElementById('project-name-display').textContent = projectInfo.name || 'Unnamed Project';
+    document.getElementById('project-description-display').textContent = projectInfo.description || 'No description provided.';
 };
 
 // Tooltip utilities
@@ -1322,7 +1394,8 @@ const sortTasksByStartDate = () => {
     });
     saveTasksToStorage();
     // Re-render timeline & tasks (use full render to recalc positions reliably)
-    renderTimeline(currentProject.startDate, currentProject.endDate);
+    const projectInfo = currentProject.project || {};
+    renderTimeline(projectInfo.startDate, projectInfo.endDate);
     showToast('Tasks sorted by start date (earliest at top).', 'success');
 };
 
@@ -1334,17 +1407,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (typeof window !== 'undefined' && window.__INITIAL_DATA__) {
             const initial = window.__INITIAL_DATA__;
             if (initial && typeof initial === 'object') {
-                // Accept either exact shape {tasks, project} or full payload
-                if (Array.isArray(initial.tasks) && initial.project) {
+                // The server sends the full Project structure
+                // Check if it's a full Project (has id, tasks, project properties)
+                if (initial.id && Array.isArray(initial.tasks) && initial.project) {
+                    // Full Project structure from server - use it directly
                     tasks = initial.tasks.map(t => { const c = Object.assign({}, t); normalizeTask(c); return c; });
-                    currentProject = Object.assign({}, initial.project);
+                    currentProject = Object.assign({}, initial);
+                    console.log('[Bootstrap] Loaded full Project from server, id:', currentProject.id);
+                    // IMPORTANT: Always save server's project to localStorage to keep them in sync
+                    saveTasksToStorage();
+                    saveProjectToStorage();
+                    bootstrapped = true;
+                } else if (Array.isArray(initial.tasks) && initial.project) {
+                    // Legacy format (partial) - construct full Project
+                    tasks = initial.tasks.map(t => { const c = Object.assign({}, t); normalizeTask(c); return c; });
+                    currentProject = {
+                        id: initial.id || generateGuid(),
+                        tasks: tasks,
+                        project: Object.assign({}, initial.project),
+                        lastUpdatedTask: initial.lastUpdatedTask || null,
+                        clientTimestamp: initial.clientTimestamp || new Date().toISOString()
+                    };
+                    console.warn('[Bootstrap] Server sent partial format, constructed full Project');
                     saveTasksToStorage();
                     saveProjectToStorage();
                     bootstrapped = true;
                 }
             }
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+        console.error('[Bootstrap] Error loading initial data:', e);
+    }
 
     if (!bootstrapped) {
         loadProjectFromStorage();
@@ -1355,7 +1448,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     //await tryFetchRemoteTasksOnLoad();
 
     renderProjectInfo();
-    renderTimeline(currentProject.startDate, currentProject.endDate);
+    const projectInfo = currentProject.project || {};
+    renderTimeline(projectInfo.startDate, projectInfo.endDate);
     sendProjectUpdate();
 
     // Task Modal listeners

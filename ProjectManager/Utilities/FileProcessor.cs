@@ -1,11 +1,10 @@
-﻿namespace ProjectManager.Utilites;
+namespace ProjectManager.Utilities;
 
 using ProjectManager.Data;
 using ProjectManager.Generators;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.Threading.Tasks;
-using ProjectManager.Data;
 using System;
 
 /// <summary>

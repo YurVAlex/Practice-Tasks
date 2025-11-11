@@ -1,6 +1,6 @@
 ﻿namespace ProjectManager.Models;
 
-using ProjectManager.Utilites;
+using ProjectManager.Utilities;
 using System.Security.Cryptography;
 
 public class Session

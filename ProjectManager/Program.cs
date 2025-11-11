@@ -1,11 +1,10 @@
 using ProjectManager;
 using ProjectManager.Data;
 using ProjectManager.Models;
-using ProjectManager.Utilites;
+using ProjectManager.Utilities;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using ProjectManager.Utilities;
 
 // This file defines the complete ASP.NET Core Minimal API server for ProTimeline app.
 //-----------------------------------------------------------------------------------------

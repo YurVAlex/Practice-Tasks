@@ -17,8 +17,9 @@ namespace ProjectManager.Models;
 /// </summary>
 public class Project
 {
-
-
+    // Unique identifier for the project
+    [JsonPropertyName("id")]
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     [JsonPropertyName("tasks")]
     public List<TaskItem> Tasks { get; set; } = new List<TaskItem>();
