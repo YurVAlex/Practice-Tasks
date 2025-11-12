@@ -458,6 +458,49 @@ const closeProjectModal = () => {
     document.getElementById('project-modal').classList.add('hidden');
 };
 
+// Create a new project and navigate to it
+const createAndLoadNewProject = async (projectName, startDate, endDate, description) => {
+    const newProject = {
+        id: generateGuid(),
+        tasks: [],
+        project: {
+            name: projectName,
+            startDate: startDate,
+            endDate: endDate,
+            description: description
+        },
+        lastUpdatedTask: null,
+        clientTimestamp: new Date().toISOString()
+    };
+    
+    console.log('[createAndLoadNewProject] Creating new project:', newProject.id);
+    console.log('[createAndLoadNewProject] Project name:', newProject.project.name);
+    
+    try {
+        const response = await fetch('http://localhost:5146/getProject', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newProject),
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            // Success - reload the page with the new project
+            console.log('[createAndLoadNewProject] Project created successfully, reloading page');
+            window.location.reload();
+        } else {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            showToast(`Failed to create project: ${errorData.error || response.statusText}`, 'error');
+            console.error('[createAndLoadNewProject] Server error:', errorData);
+        }
+    } catch (error) {
+        showToast(`Network error: ${error.message}`, 'error');
+        console.error('[createAndLoadNewProject] Network error:', error);
+    }
+};
+
 const updateProjectModalState = (mode) => {
     const dateFields = document.getElementById('project-date-fields');
     const descriptionField = document.getElementById('project-description-field');
@@ -480,7 +523,7 @@ const updateProjectModalState = (mode) => {
     }
 };
 
-const handleProjectModalOk = () => {
+const handleProjectModalOk = async () => {
     const projectName = document.getElementById('project-modal-name').value.trim();
     const projectMode = document.querySelector('input[name="project-mode"]:checked').value;
     const modalStatus = document.getElementById('project-modal-status');
@@ -491,18 +534,12 @@ const handleProjectModalOk = () => {
         return;
     }
 
-    if (projectMode === 'new') {
-        showToast(`New Project created: "${projectName}". Redirection simulation.`, 'info');
-        closeProjectModal();
-        return;
-    }
-
     const startDateStr = document.getElementById('project-modal-start-date').value;
     const endDateStr = document.getElementById('project-modal-end-date').value;
     const projectDescription = document.getElementById('project-modal-description').value.trim();
 
     if (!startDateStr || !endDateStr) {
-        modalStatus.textContent = 'Start Date and End Date are required in Current mode.';
+        modalStatus.textContent = 'Start Date and End Date are required.';
         return;
     }
 
@@ -511,6 +548,12 @@ const handleProjectModalOk = () => {
 
     if (taskStart >= taskEnd) {
         modalStatus.textContent = 'Project End Date must be after the Start Date.';
+        return;
+    }
+
+    if (projectMode === 'new') {
+        // Create new project and navigate to it
+        await createAndLoadNewProject(projectName, startDateStr, endDateStr, projectDescription);
         return;
     }
 

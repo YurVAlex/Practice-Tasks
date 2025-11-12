@@ -197,59 +197,144 @@ app.MapPost("/register", async (User userData, ApplicationDbContext dbContext, H
     }
 });
 
+// Combined GET and POST endpoint for /getProject
+// GET: Returns latest project or default
+// POST with Project DTO: Creates/loads specific project
 app.MapGet("/getProject", async (HttpContext context, ApplicationDbContext dbContext) =>
 {
-    if (context.Request.Cookies.TryGetValue("session_id_v1", out string? sessionId))
+    await HandleGetProject(context, dbContext, builder.Environment.WebRootPath, null);
+});
+
+app.MapPost("/getProject", async (HttpContext context, ApplicationDbContext dbContext) =>
+{
+    Project? requestedProject = null;
+    
+    // Try to read Project DTO from body
+    if (context.Request.ContentLength > 0)
     {
-        var session = SessionManager.GetSession(sessionId);
-        if (session == null)
+        try
         {
-            context.Response.StatusCode = 401;
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true
+            };
+            requestedProject = await JsonSerializer.DeserializeAsync<Project>(context.Request.Body, options);
         }
-        else
+        catch (Exception ex)
         {
-            // Resolve user's stored project data (if any)
-            var bootstrap = session.projectsProcessor.GetLatestProjectOrDefault();
-            
-            // Load base HTML
-            // TODO Add new method to GeneratorHtml class to return this html
-            var path = Path.Combine(builder.Environment.WebRootPath, "TaskManager.html");
-            var html = await File.ReadAllTextAsync(path);
-
-            // Injection script for initial data and session id
-            var injection = "<script>window.__INITIAL_DATA__ = " + 
-                            ProjectsSerializer.SerializeProject(bootstrap) + 
-                            ";</script>";
-            // TODO Use ProjectSerializer 
-            // TODO Add new method to GeneratorHtml class to return this string
-
-            // Insert before closing body tag
-            var idx = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
-            if (idx >= 0)
-            {
-                html = html.Insert(idx, injection);
-            }
-            else
-            {
-                html += injection;
-            }
-            // TODO Add new method to GeneratorHtml class to return this html
-
-            Console.WriteLine("================================================================================");
-            Console.WriteLine($"Sending project {bootstrap.ProjectInfo.Name}");
-            Console.WriteLine($"Session Id: {sessionId}");
-            Console.WriteLine("================================================================================");
-
-            context.Response.ContentType = "text/html; charset=utf-8";
-
-            await context.Response.WriteAsync(html);
+            Console.WriteLine($"[getProject POST] Error deserializing Project: {ex.Message}");
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsJsonAsync(new { error = "Invalid Project DTO" });
+            return;
         }
+    }
+    
+    await HandleGetProject(context, dbContext, builder.Environment.WebRootPath, requestedProject);
+});
+
+// Helper method to handle both GET and POST /getProject logic
+async Task HandleGetProject(HttpContext context, ApplicationDbContext dbContext, string webRootPath, Project? requestedProject)
+{
+    if (!context.Request.Cookies.TryGetValue("session_id_v1", out string? sessionId))
+    {
+        context.Response.StatusCode = 401;
+        return;
+    }
+    
+    var session = SessionManager.GetSession(sessionId);
+    if (session == null)
+    {
+        context.Response.StatusCode = 401;
+        return;
+    }
+    
+    Project? bootstrap;
+    
+    if (requestedProject == null)
+    {
+        // Scenario 1: No Project DTO provided - return latest or default
+        bootstrap = session.projectsProcessor.GetLatestProjectOrDefault();
+        Console.WriteLine($"[getProject] No DTO provided, using latest: {bootstrap?.ProjectInfo?.Name}");
     }
     else
     {
-        context.Response.StatusCode = 401;
+        // Project DTO was provided
+        Console.WriteLine($"[getProject] Project DTO received - Id: {requestedProject.Id}, Name: {requestedProject.ProjectInfo?.Name}");
+        
+        // Check if project exists in session
+        var existingProject = session.projectsProcessor.GetProjectById(requestedProject.Id);
+        
+        if (existingProject != null)
+        {
+            // Scenario 2: Project exists - use it
+            bootstrap = existingProject;
+            Console.WriteLine($"[getProject] Project exists in session, using it: {bootstrap.ProjectInfo?.Name}");
+        }
+        else
+        {
+            // Scenario 3: Project doesn't exist - add it to session
+            requestedProject.NormalizeTasks();
+            
+            if (session.projectsProcessor.AddProject(requestedProject))
+            {
+                bootstrap = requestedProject;
+                Console.WriteLine($"[getProject] New project added to session: {bootstrap.ProjectInfo?.Name}");
+                
+                // Persist to database
+                try
+                {
+                    string projectsJson = ProjectsSerializer.SerializeProjects(session.projectsProcessor.Projects);
+                    var user = await dbContext.Users.FirstOrDefaultAsync(u => u.ID == session.UserID);
+                    if (user != null)
+                    {
+                        user.Projects = projectsJson;
+                        await dbContext.SaveChangesAsync();
+                        Console.WriteLine($"[getProject] Project persisted to database for user {user.Email}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[getProject] Error persisting project: {ex.Message}");
+                }
+            }
+            else
+            {
+                // Failed to add (shouldn't happen unless duplicate Id)
+                Console.WriteLine($"[getProject] Failed to add project to session");
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsJsonAsync(new { error = "Failed to add project - duplicate Id?" });
+                return;
+            }
+        }
     }
-});
+    
+    // Load and inject HTML with bootstrap data
+    var path = Path.Combine(webRootPath, "TaskManager.html");
+    var html = await File.ReadAllTextAsync(path);
+    
+    var injection = "<script>window.__INITIAL_DATA__ = " + 
+                    ProjectsSerializer.SerializeProject(bootstrap) + 
+                    ";</script>";
+    
+    var idx = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+    if (idx >= 0)
+    {
+        html = html.Insert(idx, injection);
+    }
+    else
+    {
+        html += injection;
+    }
+    
+    Console.WriteLine("================================================================================");
+    Console.WriteLine($"Sending project: {bootstrap?.ProjectInfo?.Name} (Id: {bootstrap?.Id})");
+    Console.WriteLine($"Session Id: {sessionId}");
+    Console.WriteLine("================================================================================");
+    
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.WriteAsync(html);
+}
 
 app.MapPost("/projectUpdate", async (HttpContext context, ApplicationDbContext dbContext) =>
 {   // TODO use Project object as DTO in MapPost parameters
