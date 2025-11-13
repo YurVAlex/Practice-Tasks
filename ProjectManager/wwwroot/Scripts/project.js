@@ -15,6 +15,8 @@
 // const REMOTE_SYNC_ON_LOAD = true;
 const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
 const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendProjectUpdate();
+const REMOTE_PROJECTS_ENDPOINT = '/api/projects'; // list projects in session
+const REMOTE_GETPROJECT_ENDPOINT = '/getProject'; // open/switch project via server-injected HTML
 
 // Session support: read from server injection or fallback to localStorage
 /*const SESSION_STORAGE_KEY = 'session_id_v1';
@@ -91,6 +93,8 @@ let pendingDeletionTaskId = null; // for delete-confirm modal
 let _deleteModalKeyHandler = null;
 let _deleteModalOverlayHandler = null;
 let contextMenuTaskId = null; // robust context-menu selection
+let projectModalMode = 'current';
+let cachedProjectsList = null; // array of {id, name, startDate, endDate}
 
 // Tooltip element reference
 let tooltipEl = null;
@@ -449,8 +453,8 @@ const openProjectModal = () => {
     document.getElementById('project-modal-end-date').value = projectInfo.endDate || '';
     document.getElementById('project-modal-description').value = projectInfo.description || '';
     document.getElementById('project-modal-status').textContent = '';
-    document.getElementById('project-mode-current').checked = true;
-    updateProjectModalState('current');
+    projectModalMode = 'current';
+    setProjectModalTab('current');
     modal.classList.remove('hidden');
 };
 
@@ -477,7 +481,7 @@ const createAndLoadNewProject = async (projectName, startDate, endDate, descript
     console.log('[createAndLoadNewProject] Project name:', newProject.project.name);
     
     try {
-        const response = await fetch('http://localhost:5146/getProject', {
+        const response = await fetch(REMOTE_GETPROJECT_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -487,9 +491,7 @@ const createAndLoadNewProject = async (projectName, startDate, endDate, descript
         });
         
         if (response.ok) {
-            // Success - reload the page with the new project
-            console.log('[createAndLoadNewProject] Project created successfully, reloading page');
-            window.location.reload();
+            window.location.assign(REMOTE_GETPROJECT_ENDPOINT);
         } else {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             showToast(`Failed to create project: ${errorData.error || response.statusText}`, 'error');
@@ -506,28 +508,69 @@ const updateProjectModalState = (mode) => {
     const descriptionField = document.getElementById('project-description-field');
     const okButton = document.getElementById('project-modal-ok');
     const modalName = document.getElementById('project-modal-name');
+    const openList = document.getElementById('project-open-list');
 
     if (mode === 'current') {
         dateFields.classList.remove('hidden');
         descriptionField.classList.remove('hidden');
+        if (openList) openList.classList.add('hidden');
         okButton.textContent = 'OK';
         modalName.readOnly = false;
         modalName.classList.remove('bg-gray-100');
     } else if (mode === 'new') {
         dateFields.classList.remove('hidden');
         descriptionField.classList.remove('hidden');
+        if (openList) openList.classList.add('hidden');
         okButton.textContent = 'Create Project';
         modalName.readOnly = false;
         modalName.value = '';
         modalName.classList.remove('bg-gray-100');
+    } else if (mode === 'open') {
+        // Show list, hide other fields
+        dateFields.classList.add('hidden');
+        descriptionField.classList.add('hidden');
+        if (openList) openList.classList.remove('hidden');
+        okButton.textContent = 'Close';
+        modalName.readOnly = true;
+        modalName.classList.add('bg-gray-100');
     }
 };
 
+function setProjectModalTab(mode) {
+    const curBtn = document.getElementById('tab-project-current');
+    const newBtn = document.getElementById('tab-project-new');
+    const openBtn = document.getElementById('tab-project-open');
+    if (!curBtn || !newBtn) {
+        projectModalMode = mode;
+        updateProjectModalState(mode);
+        return;
+    }
+    const base = 'px-3 py-2 text-sm font-semibold border-b-2 ';
+    const active = 'border-primary-green text-primary-green';
+    const inactive = 'border-transparent text-gray-500 hover:text-gray-700';
+    curBtn.className = base + (mode === 'current' ? active : inactive);
+    newBtn.className = base + (mode === 'new' ? active : inactive);
+    if (openBtn) openBtn.className = base + (mode === 'open' ? active : inactive);
+    curBtn.setAttribute('aria-selected', mode === 'current' ? 'true' : 'false');
+    newBtn.setAttribute('aria-selected', mode === 'new' ? 'true' : 'false');
+    if (openBtn) openBtn.setAttribute('aria-selected', mode === 'open' ? 'true' : 'false');
+    projectModalMode = mode;
+    updateProjectModalState(mode);
+    if (mode === 'open') {
+        ensureProjectsListLoadedAndRender();
+    }
+}
+
 const handleProjectModalOk = async () => {
     const projectName = document.getElementById('project-modal-name').value.trim();
-    const projectMode = document.querySelector('input[name="project-mode"]:checked').value;
+    const projectMode = projectModalMode;
     const modalStatus = document.getElementById('project-modal-status');
     modalStatus.textContent = '';
+
+    if (projectMode === 'open') {
+        closeProjectModal();
+        return;
+    }
 
     if (!projectName) {
         modalStatus.textContent = 'Project Name is required.';
@@ -588,6 +631,86 @@ const handleProjectModalOk = async () => {
     sendProjectUpdate();
     
 };
+
+async function ensureProjectsListLoadedAndRender(force = false) {
+    if (cachedProjectsList === null || force) {
+        try {
+            const resp = await fetch(REMOTE_PROJECTS_ENDPOINT, { credentials: 'include' });
+            if (resp.ok) {
+                cachedProjectsList = await resp.json();
+            } else {
+                cachedProjectsList = [];
+            }
+        } catch (e) {
+            console.error('Failed to load projects list', e);
+            cachedProjectsList = [];
+        }
+    }
+    renderProjectsList(cachedProjectsList || []);
+}
+
+function renderProjectsList(items) {
+    const body = document.getElementById('project-open-list-body');
+    if (!body) return;
+    body.innerHTML = '';
+    if (!Array.isArray(items) || items.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'p-3 text-sm text-gray-600';
+        empty.textContent = 'No projects available.';
+        body.appendChild(empty);
+        return;
+    }
+    items.forEach(p => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'w-full text-left p-3 hover:bg-gray-50 flex items-center justify-between';
+        row.setAttribute('data-id', p.id);
+        row.addEventListener('click', () => openExistingProject(p.id, p.name));
+        const name = document.createElement('span');
+        name.className = 'text-sm font-medium text-gray-800';
+        name.textContent = p.name || '(unnamed)';
+        const dates = document.createElement('span');
+        dates.className = 'text-xs text-gray-500';
+        
+        if (p.timestamp) {
+            dates.textContent = `${p.timestamp.toLocaleString()}`;
+        }
+        row.appendChild(name);
+        row.appendChild(dates);
+        body.appendChild(row);
+    });
+}
+
+async function openExistingProject(projectId, projectName) {
+    try {
+        const payload = {
+            id: projectId,
+            tasks: [],
+            project: {
+                name: projectName,
+                startDate: null,
+                endDate: null,
+                description: ''
+            },
+            lastUpdatedTask: null,
+            clientTimestamp: new Date().toISOString()
+        };
+        const response = await fetch(REMOTE_GETPROJECT_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            credentials: 'include'
+        });
+        if (response.ok) {
+            window.location.assign(REMOTE_GETPROJECT_ENDPOINT);
+        } else {
+            showToast('Failed to open project.', 'error');
+        }
+    } catch (e) {
+        console.error('Open project failed', e);
+        showToast('Network error while opening project.', 'error');
+    }
+}
 
 // --- QUICK SCALE modal helpers (new) ---
 // Opens the compact modal used when clicking the progress line.
@@ -1505,8 +1628,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('project-modal-cancel').addEventListener('click', closeProjectModal);
     document.getElementById('project-modal-ok').addEventListener('click', handleProjectModalOk);
 
-    document.getElementById('project-mode-current').addEventListener('change', (e) => updateProjectModalState(e.target.value));
-    document.getElementById('project-mode-new').addEventListener('change', (e) => updateProjectModalState(e.target.value));
+    const tabCur = document.getElementById('tab-project-current');
+    if (tabCur) tabCur.addEventListener('click', () => setProjectModalTab('current'));
+    const tabNew = document.getElementById('tab-project-new');
+    if (tabNew) tabNew.addEventListener('click', () => setProjectModalTab('new'));
+    const tabOpen = document.getElementById('tab-project-open');
+    if (tabOpen) tabOpen.addEventListener('click', () => setProjectModalTab('open'));
+
+    const refreshListBtn = document.getElementById('refresh-projects-list');
+    if (refreshListBtn) refreshListBtn.addEventListener('click', () => ensureProjectsListLoadedAndRender(true));
 
     // QUICK SCALE modal listeners (progress-line click / small modal)
     const progressLine = document.getElementById('progress-line');

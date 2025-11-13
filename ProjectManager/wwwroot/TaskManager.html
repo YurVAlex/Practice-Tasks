@@ -38,20 +38,17 @@
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
             <h2 class="text-xl font-bold mb-4 text-gray-800">Manage Project</h2>
             <div id="project-modal-status" class="text-red-600 text-sm mb-3 font-medium"></div>
+            <div id="project-modal-tabs" class="mb-4 border-b border-gray-200">
+                <nav class="flex space-x-4" role="tablist" aria-label="Project modes">
+                    <button id="tab-project-current" type="button" data-mode="current" class="px-3 py-2 text-sm font-semibold border-b-2 border-primary-green text-primary-green" aria-selected="true" role="tab">Current</button>
+                    <button id="tab-project-new" type="button" data-mode="new" class="px-3 py-2 text-sm font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700" aria-selected="false" role="tab">New</button>
+                    <button id="tab-project-open" type="button" data-mode="open" class="px-3 py-2 text-sm font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700" aria-selected="false" role="tab">Open</button>
+                </nav>
+            </div>
             <div class="space-y-4">
                 <div>
                     <label for="project-modal-name" class="block text-sm font-medium text-gray-700">Project Name</label>
                     <input type="text" id="project-modal-name" placeholder="e.g., Q4 Launch Strategy" class="mt-1 block w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div class="flex space-x-6">
-                    <div class="flex items-center">
-                        <input id="project-mode-current" name="project-mode" type="radio" value="current" checked class="h-4 w-4 text-primary-green border-gray-300 focus:ring-primary-green">
-                        <label for="project-mode-current" class="ml-2 block text-sm font-medium text-gray-700">Current</label>
-                    </div>
-                    <div class="flex items-center">
-                        <input id="project-mode-new" name="project-mode" type="radio" value="new" class="h-4 w-4 text-primary-green border-gray-300 focus:ring-primary-green">
-                        <label for="project-mode-new" class="ml-2 block text-sm font-medium text-gray-700">New</label>
-                    </div>
                 </div>
                 <div id="project-date-fields" class="flex space-x-4">
                     <div class="flex-1">
@@ -66,6 +63,17 @@
                 <div id="project-description-field">
                     <label for="project-modal-description" class="block text-sm font-medium text-gray-700">Description</label>
                     <textarea id="project-modal-description" rows="15" class="mt-1 block w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+
+                <!-- Open projects list (hidden by default; shown in "Open" tab) -->
+                <div id="project-open-list" class="hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-700">Your Projects</h3>
+                        <button id="refresh-projects-list" type="button" class="text-xs text-gray-600 hover:text-gray-800 underline">Refresh</button>
+                    </div>
+                    <div id="project-open-list-body" class="max-h-64 overflow-y-auto divide-y divide-gray-200 border border-gray-200 rounded-md">
+                        <!-- Items injected by JS -->
+                    </div>
                 </div>
             </div>
             <div class="flex justify-end space-x-3 mt-6">
