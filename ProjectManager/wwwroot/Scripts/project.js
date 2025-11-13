@@ -16,7 +16,9 @@
 const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
 const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendProjectUpdate();
 const REMOTE_PROJECTS_ENDPOINT = '/api/projects'; // list projects in session
-const REMOTE_GETPROJECT_ENDPOINT = '/getProject'; // open/switch project via server-injected HTML
+const REMOTE_GETPROJECT_ENDPOINT = '/getProject'; 
+const REMOTE_POSTPROJECT_ENDPOINT = '/newProject';
+const REMOTE_OPENPROJECT_ENDPOINT = '/openProject';
 
 // Session support: read from server injection or fallback to localStorage
 /*const SESSION_STORAGE_KEY = 'session_id_v1';
@@ -481,7 +483,7 @@ const createAndLoadNewProject = async (projectName, startDate, endDate, descript
     console.log('[createAndLoadNewProject] Project name:', newProject.project.name);
     
     try {
-        const response = await fetch(REMOTE_GETPROJECT_ENDPOINT, {
+        const response = await fetch(REMOTE_POSTPROJECT_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -491,7 +493,10 @@ const createAndLoadNewProject = async (projectName, startDate, endDate, descript
         });
         
         if (response.ok) {
-            window.location.assign(REMOTE_GETPROJECT_ENDPOINT);
+            const okData = await response.json();
+            showToast(`Success - added new project. ${okData.success}`, 'success');
+            console.log('[createAndLoadNewProject] Success - added new project.', okData.success);
+            window.location.href = REMOTE_GETPROJECT_ENDPOINT;
         } else {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             showToast(`Failed to create project: ${errorData.error || response.statusText}`, 'error');
@@ -695,14 +700,17 @@ async function openExistingProject(projectId, projectName) {
             lastUpdatedTask: null,
             clientTimestamp: new Date().toISOString()
         };
-        const response = await fetch(REMOTE_GETPROJECT_ENDPOINT, {
+        const response = await fetch(REMOTE_OPENPROJECT_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
             credentials: 'include'
         });
         if (response.ok) {
-            window.location.assign(REMOTE_GETPROJECT_ENDPOINT);
+            const okData = await response.json();
+            showToast(`Success - open new project. ${okData.success}`, 'success');
+            console.log('[openExistingProject] Success - open new project.', okData.success);
+            window.location.href = REMOTE_GETPROJECT_ENDPOINT;
         } else {
             showToast('Failed to open project.', 'error');
         }

@@ -150,8 +150,7 @@ async function registerUser() {
             } catch (e) { }
             displayStatus(`Registration successful! Welcome, ${newUser.name || ''}. Redirecting...`, 'success');
             // Redirect to TaskManager (include sessionId as query for initial load)
-            const sid = newUser && newUser.sessionId ? String(newUser.sessionId) : '';
-            window.location.href = `/getProject${sid ? (`?sessionId=${encodeURIComponent(sid)}`) : ''}`;
+            window.location.href = `/getProject`;
         } else {
             let errorText = 'Please try again.';
             try {
