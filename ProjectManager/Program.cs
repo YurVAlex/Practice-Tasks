@@ -419,7 +419,7 @@ app.MapPost("/projectUpdate", async (HttpContext context, ApplicationDbContext d
                 catch (Exception ex)
                 {
                     Console.WriteLine("Error serializing Projects from session cache: " + ex);
-                    return Results.Problem("Failed to serialize Projects from session cache.");
+                    return Results.BadRequest(new { success = false, error = "Failed to serialize Projects from session cache." });
                 }
 
                 // Database Lookup - TODO Delete that add scheduled database update in DataProcessor class)

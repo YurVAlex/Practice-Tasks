@@ -10,9 +10,6 @@
     }
 }
 
-// Optional: toggle remote fetch-on-load behavior (if your backend exposes a tasks endpoint).
-// If you want to try server-side syncing on load, set to true and supply a matching endpoint.
-// const REMOTE_SYNC_ON_LOAD = true;
 const REMOTE_TASKS_ENDPOINT = 'http://localhost:5146/projectTasks'; // optional endpoint to GET tasks
 const REMOTE_UPDATE_ENDPOINT = 'http://localhost:5146/projectUpdate'; // used by sendProjectUpdate();
 const REMOTE_PROJECTS_ENDPOINT = '/api/projects'; // list projects in session
@@ -20,26 +17,10 @@ const REMOTE_GETPROJECT_ENDPOINT = '/getProject';
 const REMOTE_POSTPROJECT_ENDPOINT = '/newProject';
 const REMOTE_OPENPROJECT_ENDPOINT = '/openProject';
 
-// Session support: read from server injection or fallback to localStorage
-/*const SESSION_STORAGE_KEY = 'session_id_v1';
-let SESSION_ID = '';
-try {
-    if (typeof window !== 'undefined' && window.__SESSION_ID__ && String(window.__SESSION_ID__).length > 0) {
-        SESSION_ID = String(window.__SESSION_ID__);
-        localStorage.setItem(SESSION_STORAGE_KEY, SESSION_ID);
-    } else {
-        SESSION_ID = localStorage.getItem(SESSION_STORAGE_KEY) || '';
-    }
-} catch (e) {
-    // ignore storage errors
-}*/
-
-
 // --- Storage keys (version these if you change the shape later) ---
 const STORAGE_KEY_TASKS = 'timeline_tasks_v1';
 const STORAGE_KEY_PROJECT = 'timeline_project_v1';
 
-// Default project and tasks (used when nothing in storage)
 // Helper to generate a new GUID (simple version for client-side)
 function generateGuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -190,6 +171,7 @@ function loadProjectFromStorage() {
                 currentProject = getDefaultProject();
             }
             // Ensure id exists (for backward compatibility with old data)
+            // CONSIDER TO DELETE THAT
             if (!currentProject.id) {
                 currentProject.id = generateGuid();
                 console.warn('[loadProjectFromStorage] Project missing id, generated:', currentProject.id);
@@ -223,8 +205,7 @@ async function sendProjectUpdate() {
         clientTimestamp: new Date().toISOString()
     };
     
-    console.log('[sendProjectUpdate] Sending project with id:', payload.id);
-    console.log('[sendProjectUpdate] Project name:', payload.project?.name);
+    console.log('[sendProjectUpdate] Sending project with id:', payload.id, 'Name:', payload.project?.name);
 
     try {
         const response = await fetch(REMOTE_UPDATE_ENDPOINT, {
@@ -235,13 +216,26 @@ async function sendProjectUpdate() {
             body: JSON.stringify(payload),
             credentials: 'include' // <--- THIS IS CRITICAL FOR SENDING COOKIES
         });
-
-        if (!response.ok) {
+        if (response.status === 401) {
+            // Unauthorized
+            console.error("Authentication Failed: User is Unauthorized, or session management error.");
+            showToast(`Authentication Failed. Remote project are not updated!`, 'info');
+            // TODO Redirect to login page ???
+        }
+        if (response.status === 400) {
+            const warnData = await response.json();
             // non-2xx responses are still considered "successful fetch" but report them
-            console.warn(`projectUpdate returned status ${response.status}`);
+            console.warn(`[sendProjectUpdate] projectUpdate returned status ${response.status}`);
+            console.warn(`[sendProjectUpdate] ${warnData.error}`);
+            showToast(`${warnData.error}`, 'info');
+        }
+        if (response.status === 200) {
+            const okData = await response.json();
+            // non-2xx responses are still considered "successful fetch" but report them
+            console.log(`[sendProjectUpdate] Successful remote update! ${okData.savedFor} updated, ${okData.receivedTasks} tasks sended.`);
+            showToast(`Remote update ${okData.savedFor}: done.`, 'success');
         }
         return response;
-
     } catch (error) {
         // Network / fetch error — keep local storage authoritative but surface the problem to console
         console.error('Failed to send projectUpdate payload:', error);
@@ -1587,13 +1581,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Full Project structure from server - use it directly
                     tasks = initial.tasks.map(t => { const c = Object.assign({}, t); normalizeTask(c); return c; });
                     currentProject = Object.assign({}, initial);
-                    console.log('[Bootstrap] Loaded full Project from server, id:', currentProject.id);
+                    console.log('[Bootstrap] Loaded full Project from server, id:', currentProject.id, '. Name: ', currentProject.project.name);
                     // IMPORTANT: Always save server's project to localStorage to keep them in sync
                     saveTasksToStorage();
                     saveProjectToStorage();
                     bootstrapped = true;
                 } else if (Array.isArray(initial.tasks) && initial.project) {
                     // Legacy format (partial) - construct full Project
+                    // CONSIDER TO DELETE THAT
                     tasks = initial.tasks.map(t => { const c = Object.assign({}, t); normalizeTask(c); return c; });
                     currentProject = {
                         id: initial.id || generateGuid(),
@@ -1617,9 +1612,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadProjectFromStorage();
         loadTasksFromStorage();
     }
-
-    // Optional remote sync on load (if you enable REMOTE_SYNC_ON_LOAD)
-    //await tryFetchRemoteTasksOnLoad();
 
     renderProjectInfo();
     const projectInfo = currentProject.project || {};
