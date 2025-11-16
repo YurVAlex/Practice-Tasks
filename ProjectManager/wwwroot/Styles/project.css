@@ -98,3 +98,70 @@
     #task-tooltip, #task-tooltip * {
         user-select: none;
     }
+
+/* --- Task Resizing Handles --- */
+
+.resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px; /* Made slightly wider */
+    cursor: e-resize;
+    z-index: 20;
+    /* Add a subtle, semi-transparent background to make it always visible */
+    background-color: rgba(0, 0, 0, 0.15);
+    display: flex; /* Use flex to center the grip icon */
+    align-items: center;
+    justify-content: center;
+}
+
+.resize-handle-left {
+    left: 0;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-right: 1px solid rgba(0, 0, 0, 0.1); /* Add a subtle inner line */
+}
+
+.resize-handle-right {
+    right: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    border-left: 1px solid rgba(0, 0, 0, 0.1); /* Add a subtle inner line */
+}
+
+/* A stronger hover state */
+.resize-handle:hover {
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* * Add a "grip" icon using a pseudo-element.
+ * This creates three small vertical white dots.
+*/
+.resize-handle::after {
+    content: '';
+    display: block;
+    width: 3px;
+    height: 12px;
+    background-image: radial-gradient(circle at center, white 1px, transparent 1px), radial-gradient(circle at center, white 1px, transparent 1px), radial-gradient(circle at center, white 1px, transparent 1px);
+    background-size: 3px 3px;
+    background-position: center 0, center 50%, center 100%;
+    background-repeat: no-repeat;
+    opacity: 0.7;
+}
+
+/* --- Global Resizing State --- */
+
+/* * Applied to <body> via JS during drag.
+ * Prevents text selection and sets cursor globally.
+ */
+body.is-resizing {
+    cursor: e-resize !important; /* Force cursor */
+    user-select: none;
+}
+
+    /* * Apply user-select: none to ALL elements during resize.
+ * This MUST be a separate rule, not nested.
+ */
+    body.is-resizing * {
+        user-select: none;
+    }

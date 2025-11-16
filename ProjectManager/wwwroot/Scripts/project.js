@@ -79,6 +79,225 @@ let contextMenuTaskId = null; // robust context-menu selection
 let projectModalMode = 'current';
 let cachedProjectsList = null; // array of {id, name, startDate, endDate}
 
+// ... after 'let cachedProjectsList = null;'
+
+// --- Task Resizing State ---
+let isResizing = false;
+let resizeTaskId = null;
+let resizeHandleType = null; // 'start' or 'end'
+let dragStartX = 0;
+let originalTaskDate = null;
+let daysPerPixel = 0;
+
+
+/**
+ * ----------------------------------------------------------------
+ * Task Resizing Handlers (Drag and Drop)
+ * ----------------------------------------------------------------
+ */
+
+/**
+ * Handles mousedown on a resize handle.
+ * Initiates the resize drag operation.
+ */
+function onHandleMouseDown(e, taskId, handleType) {
+    // CRITICAL: Stop propagation to prevent task bar's 'onclick' (open modal)
+    e.preventDefault();
+    e.stopPropagation();
+
+    const task = tasks.find(t => Number(t.id) === Number(taskId));
+    if (!task) return;
+
+    // Set global state
+    isResizing = true;
+    resizeTaskId = taskId;
+    resizeHandleType = handleType;
+    dragStartX = e.clientX;
+
+    // Store the original date being modified
+    originalTaskDate = new Date(task[handleType === 'start' ? 'startDate' : 'endDate'] + 'T00:00:00');
+
+    // Calculate the pixels-to-days conversion factor
+    const timelineContainer = document.getElementById('timeline-container');
+    const timelineContainerRect = timelineContainer.getBoundingClientRect();
+    const timelinePixelWidth = timelineContainerRect.width;
+
+    if (timelineTotalDays <= 0 || timelinePixelWidth <= 0) {
+        console.error("Cannot calculate timeline geometry for resize.");
+        isResizing = false;
+        return;
+    }
+
+    // How many days each pixel of drag represents
+    daysPerPixel = timelineTotalDays / timelinePixelWidth;
+
+    // Add global listeners to track mouse movement everywhere
+    document.addEventListener('mousemove', onHandleMouseMove);
+    document.addEventListener('mouseup', onHandleMouseUp);
+
+    // Add body class to set cursor and disable text selection
+    document.body.classList.add('is-resizing');
+}
+
+/**
+ * Handles mousemove during a resize operation.
+ * Calculates the new date and shows a tooltip.
+ */
+function onHandleMouseMove(e) {
+    if (!isResizing) return;
+
+    e.preventDefault();
+
+    // Calculate pixel and day deltas
+    const dx = e.clientX - dragStartX;
+    const dayDelta = Math.round(dx * daysPerPixel);
+
+    // Calculate new date
+    const newDate = new Date(originalTaskDate.getTime());
+    newDate.setDate(originalTaskDate.getDate() + dayDelta);
+
+    // Find the task to validate against the *other* handle
+    const task = tasks.find(t => Number(t.id) === Number(resizeTaskId));
+    if (!task) return;
+
+    // --- Live Validation ---
+    // Don't let the user drag past the other handle
+    if (resizeHandleType === 'start') {
+        const endDate = new Date(task.endDate + 'T00:00:00');
+        if (newDate >= endDate) {
+            // Stop drag from going further
+            showTooltipAt(e.clientX, e.clientY, "Start date must be before end date.");
+            return;
+        }
+    } else { // 'end'
+        const startDate = new Date(task.startDate + 'T00:00:00');
+        if (newDate <= startDate) {
+            // Stop drag from going further
+            showTooltipAt(e.clientX, e.clientY, "End date must be after start date.");
+            return;
+        }
+    }
+
+    // --- Live DOM Update ---
+    // Visually update the bar's position and width during the drag
+    const taskBar = document.getElementById('task-bars-container').querySelector(`[data-task-id="${resizeTaskId}"]`);
+    if (taskBar) {
+        let visualStartDateStr, visualEndDateStr;
+
+        if (resizeHandleType === 'start') {
+            visualStartDateStr = dateToISOString(newDate);
+            visualEndDateStr = task.endDate;
+        } else { // 'end'
+            visualStartDateStr = task.startDate;
+            visualEndDateStr = dateToISOString(newDate);
+        }
+
+        // Re-calculate bar geometry based on the new virtual dates
+        const visualTaskStart = new Date(visualStartDateStr + 'T00:00:00');
+        const visualTaskEnd = new Date(visualEndDateStr + 'T00:00:00');
+
+        const startDayOffset = getDayDifference(timelineStartDate, visualTaskStart);
+        const endDayOffset = getDayDifference(timelineStartDate, visualTaskEnd);
+
+        const actualStartDay = Math.max(0, startDayOffset);
+        const actualEndDay = Math.min(timelineTotalDays, endDayOffset);
+        const visibleTaskDuration = actualEndDay - actualStartDay;
+
+        const leftPercent = (actualStartDay / timelineTotalDays) * 100;
+        const widthPercent = (visibleTaskDuration / timelineTotalDays) * 100;
+
+        // Apply new styles to the DOM element
+        taskBar.style.left = `${leftPercent.toFixed(2)}%`;
+        taskBar.style.width = `${widthPercent.toFixed(2)}%`;
+    }
+    // --- End Live DOM Update ---
+
+    // Show feedback tooltip
+    const newDateStr = dateToISOString(newDate);
+    showTooltipAt(e.clientX, e.clientY, `Set ${resizeHandleType} date to: ${newDateStr}`);
+}
+
+/**
+ * Handles mouseup, ending the resize operation.
+ * Validates, saves the new date, and re-renders.
+ */
+/**
+ * Handles mouseup, ending the resize operation.
+ * Validates, saves the new date, and re-renders.
+ */
+function onHandleMouseUp(e) {
+    if (!isResizing) return;
+
+    e.preventDefault();
+
+    // --- 1. Clean up global state and listeners ---
+    isResizing = false;
+    document.removeEventListener('mousemove', onHandleMouseMove);
+    document.removeEventListener('mouseup', onHandleMouseUp);
+    document.body.classList.remove('is-resizing');
+    hideTooltip();
+
+    // --- 2. Find the task to update ---
+    const task = tasks.find(t => Number(t.id) === Number(resizeTaskId));
+    if (!task) {
+        resizeTaskId = null;
+        renderTasks(); // Task not found? Re-render to be safe.
+        return;
+    }
+
+    // --- 3. Calculate final new date ---
+    const dx = e.clientX - dragStartX;
+    const dayDelta = Math.round(dx * daysPerPixel);
+
+    // If no significant change, just snap back
+    if (dayDelta === 0) {
+        resizeTaskId = null;
+        renderTasks(); // Snap back
+        return;
+    }
+
+    const newDate = new Date(originalTaskDate.getTime());
+    newDate.setDate(originalTaskDate.getDate() + dayDelta);
+    const newDateStr = dateToISOString(newDate);
+
+    // --- 4. Final Validation ---
+    let canSave = false; // Default to false
+
+    if (resizeHandleType === 'start') {
+        const endDate = new Date(task.endDate + 'T00:00:00');
+        if (newDate >= endDate) {
+            showToast('Start date must be before end date.', 'error');
+        } else {
+            task.startDate = newDateStr;
+            canSave = true;
+        }
+    } else { // 'end'
+        const startDate = new Date(task.startDate + 'T00:00:00');
+        if (newDate <= startDate) {
+            showToast('End date must be after start date.', 'error');
+        } else {
+            task.endDate = newDateStr;
+            canSave = true;
+        }
+    }
+
+    // --- 5. Save and Re-render (on success) OR Revert (on fail) ---
+    if (canSave) {
+        saveTasksToStorage();
+        showToast(`Task "${task.name}" dates updated.`, 'success');
+
+        // This will re-render tasks and expand timeline if needed
+        checkAndUpdateTimeline();
+        sendProjectUpdate();
+    } else {
+        // Validation failed. Snap back to original state from `tasks` array.
+        renderTasks();
+    }
+
+    // Clear task ID
+    resizeTaskId = null;
+}
+
 // Tooltip element reference
 let tooltipEl = null;
 
@@ -1375,6 +1594,20 @@ const renderTasks = () => {
             taskBar.addEventListener('mouseleave', () => {
                 hideTooltip();
             });
+
+            // --- NEW: Add Resize Handles ---
+
+            // Create and append Left Handle
+            const leftHandle = document.createElement('div');
+            leftHandle.className = 'resize-handle resize-handle-left';
+            leftHandle.addEventListener('mousedown', (ev) => onHandleMouseDown(ev, task.id, 'start'));
+            taskBar.appendChild(leftHandle);
+
+            // Create and append Right Handle
+            const rightHandle = document.createElement('div');
+            rightHandle.className = 'resize-handle resize-handle-right';
+            rightHandle.addEventListener('mousedown', (ev) => onHandleMouseDown(ev, task.id, 'end'));
+            taskBar.appendChild(rightHandle);
 
             taskBarsContainer.appendChild(taskBar);
         }
