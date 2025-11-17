@@ -106,7 +106,7 @@
     top: 0;
     bottom: 0;
     width: 12px; /* Made slightly wider */
-    cursor: e-resize;
+    cursor: w-resize; /* Use col-resize for both left/right */
     z-index: 20;
     /* Add a subtle, semi-transparent background to make it always visible */
     background-color: rgba(0, 0, 0, 0.15);
@@ -155,13 +155,18 @@
  * Prevents text selection and sets cursor globally.
  */
 body.is-resizing {
-    cursor: e-resize !important; /* Force cursor */
+    cursor: w-resize !important; /* Force cursor */
     user-select: none;
 }
 
-    /* * Apply user-select: none to ALL elements during resize.
+/* * Apply user-select: none to ALL elements during resize.
  * This MUST be a separate rule, not nested.
  */
     body.is-resizing * {
         user-select: none;
+        cursor: w-resize !important; /* Force cursor */
     }
+
+/* * The extra "}" that was here at the end of the file has been removed.
+ * This was the source of the bug.
+ */
