@@ -110,6 +110,10 @@ function onHandleMouseDown(e, taskId, handleType) {
 
     // Set global state
     isResizing = true;
+
+    // FIX: Force tooltip to hide immediately when drag starts
+    hideTooltip();
+
     resizeTaskId = taskId;
     resizeHandleType = handleType;
     dragStartX = e.clientX;
@@ -166,20 +170,18 @@ function onHandleMouseMove(e) {
         const endDate = new Date(task.endDate + 'T00:00:00');
         if (newDate >= endDate) {
             // Stop drag from going further
-            showTooltipAt(e.clientX, e.clientY, "Start date must be before end date.");
+            // Optional: You can show a warning tooltip here if you really want, 
+            // but usually stopping the movement is enough feedback.
             return;
         }
     } else { // 'end'
         const startDate = new Date(task.startDate + 'T00:00:00');
         if (newDate <= startDate) {
-            // Stop drag from going further
-            showTooltipAt(e.clientX, e.clientY, "End date must be after start date.");
             return;
         }
     }
 
-    // --- Live DOM Update ---
-    // Visually update the bar's position and width during the drag
+    // --- Live DOM Update (Bar Position) ---
     const taskBar = document.getElementById('task-bars-container').querySelector(`[data-task-id="${resizeTaskId}"]`);
     if (taskBar) {
         let visualStartDateStr, visualEndDateStr;
@@ -209,18 +211,34 @@ function onHandleMouseMove(e) {
         // Apply new styles to the DOM element
         taskBar.style.left = `${leftPercent.toFixed(2)}%`;
         taskBar.style.width = `${widthPercent.toFixed(2)}%`;
-    }
-    // --- End Live DOM Update ---
 
-    // Show feedback tooltip
-    const newDateStr = dateToISOString(newDate);
-    showTooltipAt(e.clientX, e.clientY, `Set ${resizeHandleType} date to: ${newDateStr}`);
+        // --- NEW: Live Date Label Update ---
+
+        // 1. Format the new date
+        const newMonthStr = newDate.toLocaleString('en-US', { month: 'short' });
+        const newDayStr = newDate.getDate();
+
+        // 2. Find the correct side element (start or end)
+        let dateDisplayContainer;
+        if (resizeHandleType === 'start') {
+            dateDisplayContainer = taskBar.querySelector('.task-start-display');
+        } else {
+            dateDisplayContainer = taskBar.querySelector('.task-end-display');
+        }
+
+        // 3. Update the text inside
+        if (dateDisplayContainer) {
+            const monthSpan = dateDisplayContainer.querySelector('.month-span');
+            const daySpan = dateDisplayContainer.querySelector('.day-span');
+            if (monthSpan) monthSpan.textContent = newMonthStr;
+            if (daySpan) daySpan.textContent = newDayStr;
+        }
+    }
+
+    // Ensure tooltip is hidden during resize so it doesn't block the view
+    hideTooltip();
 }
 
-/**
- * Handles mouseup, ending the resize operation.
- * Validates, saves the new date, and re-renders.
- */
 /**
  * Handles mouseup, ending the resize operation.
  * Validates, saves the new date, and re-renders.
@@ -1556,37 +1574,42 @@ const renderTasks = () => {
                                     ${labelSuffix || ''}
                                 </span>
                             </div>
-                            <div class="absolute top-0 -left-10 flex flex-col items-center w-12 z-10">
-                                <span class="text-xs font-bold text-gray-700">${startMonth}</span>
-                                <span class="text-xs text-gray-700">${startDay}</span>
+                            <div class="task-start-display absolute top-0 -left-10 flex flex-col items-center w-12 z-10">
+                                <span class="month-span text-xs font-bold text-gray-700">${startMonth}</span>
+                                <span class="day-span text-xs text-gray-700">${startDay}</span>
                             </div>
-                            <div class="absolute top-0 -right-10 flex flex-col items-center w-12 z-10">
-                                <span class="text-xs font-bold text-gray-700 ">${endMonth}</span>
-                                <span class="text-xs text-gray-700">${endDay}</span>
+                            <div class="task-end-display absolute top-0 -right-10 flex flex-col items-center w-12 z-10">
+                                <span class="month-span text-xs font-bold text-gray-700">${endMonth}</span>
+                                <span class="day-span text-xs text-gray-700">${endDay}</span>
                             </div>
                         `;
 
             // Attach hover handlers for tooltip
+
             // mouseenter -> show tooltip
             taskBar.addEventListener('mouseenter', (ev) => {
+                // FIX: specific check to stop tooltip if we are currently resizing
+                if (isResizing) return;
+
                 // If context menu or modal open, do not show
                 const ctx = document.getElementById('context-menu');
                 if (ctx && !ctx.classList.contains('hidden')) return;
+
                 const descr = task.description || 'No description provided.';
-                // Use simple HTML - escape content minimal by text node creation below
                 const safeHtml = escapeHtml(descr);
-                // Show tooltip near mouse pointer
                 showTooltipAt(ev.clientX, ev.clientY, safeHtml);
             });
 
             // mousemove -> reposition tooltip
             taskBar.addEventListener('mousemove', (ev) => {
+                // FIX: specific check to stop tooltip if we are currently resizing
+                if (isResizing) return;
+
                 const ctx = document.getElementById('context-menu');
                 if (ctx && !ctx.classList.contains('hidden')) {
                     hideTooltip();
                     return;
                 }
-                // Update position
                 showTooltipAt(ev.clientX, ev.clientY, escapeHtml(task.description || 'No description provided.'));
             });
 
